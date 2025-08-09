@@ -1,0 +1,198 @@
+import React, { useState, useEffect } from "react";
+
+export default function SystemOptimization() {
+  const [status, setStatus] = useState({
+    tempCleanup: "idle",
+    registryTweaks: "idle",
+    startupManager: "idle",
+    ramCleaner: "idle",
+    cpuGpuTweaks: "idle",
+    bgProcessMgmt: "idle",
+  });
+
+  const [backupCreated, setBackupCreated] = useState(false);
+  const [selectedProcesses, setSelectedProcesses] = useState([]);
+  const [processList, setProcessList] = useState([
+    // Example static, to be replaced by agent API data
+    { pid: 1234, name: "Discord.exe" },
+    { pid: 5678, name: "Chrome.exe" },
+    { pid: 9012, name: "GameOverlay.exe" },
+  ]);
+
+  // Simulate calling agent API for backup creation
+  const handleCreateBackup = () => {
+    setBackupCreated(true);
+    alert("Backup created! You can now safely apply tweaks.");
+  };
+
+  // Simulate running cleanup or tweaks
+  const runOptimization = async (feature) => {
+    setStatus((prev) => ({ ...prev, [feature]: "running" }));
+    // Call your local agent API here
+    await new Promise((res) => setTimeout(res, 2000)); // simulate delay
+    setStatus((prev) => ({ ...prev, [feature]: "done" }));
+  };
+
+  // Toggle process selection for Background Process Mgmt
+  const toggleProcessSelection = (pid) => {
+    setSelectedProcesses((prev) =>
+      prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
+    );
+  };
+
+  // Simulate killing selected processes
+  const killSelectedProcesses = () => {
+    if (selectedProcesses.length === 0) {
+      alert("No processes selected!");
+      return;
+    }
+    alert(`Killing processes: ${selectedProcesses.join(", ")}`);
+    setSelectedProcesses([]);
+    // Call agent API to kill processes
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-8 font-sans text-gray-900">
+      <h2 className="text-3xl font-bold mb-4">System Optimization</h2>
+
+      <button
+        onClick={handleCreateBackup}
+        className={`px-4 py-2 rounded ${
+          backupCreated ? "bg-green-500" : "bg-blue-600"
+        } text-white font-semibold`}
+      >
+        {backupCreated ? "Backup Created ✅" : "Create Backup Before Tweaks"}
+      </button>
+
+      {/* Temp File Cleanup */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">Temporary File Cleanup</h3>
+        <p className="mb-3 text-gray-700">
+          Remove temporary files to free up disk space.
+        </p>
+        <button
+          disabled={!backupCreated || status.tempCleanup === "running"}
+          onClick={() => runOptimization("tempCleanup")}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded"
+        >
+          {status.tempCleanup === "running"
+            ? "Cleaning..."
+            : status.tempCleanup === "done"
+            ? "Cleaned ✅"
+            : "Clean Temp Files"}
+        </button>
+      </section>
+
+      {/* Registry Tweaks */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">Registry Tweaks</h3>
+        <p className="mb-3 text-gray-700">
+          Apply recommended registry tweaks to optimize system performance.
+        </p>
+        <button
+          disabled={!backupCreated || status.registryTweaks === "running"}
+          onClick={() => runOptimization("registryTweaks")}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded"
+        >
+          {status.registryTweaks === "running"
+            ? "Applying..."
+            : status.registryTweaks === "done"
+            ? "Applied ✅"
+            : "Apply Tweaks"}
+        </button>
+      </section>
+
+      {/* Startup Manager */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">Startup Manager</h3>
+        <p className="mb-3 text-gray-700">
+          Manage startup programs to speed up boot time.
+        </p>
+        <button
+          disabled={!backupCreated || status.startupManager === "running"}
+          onClick={() => runOptimization("startupManager")}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded"
+        >
+          {status.startupManager === "running"
+            ? "Optimizing..."
+            : status.startupManager === "done"
+            ? "Optimized ✅"
+            : "Optimize Startup"}
+        </button>
+      </section>
+
+      {/* RAM Cleaner */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">RAM Cleaner</h3>
+        <p className="mb-3 text-gray-700">
+          Free up RAM by clearing inactive memory.
+        </p>
+        <button
+          disabled={!backupCreated || status.ramCleaner === "running"}
+          onClick={() => runOptimization("ramCleaner")}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded"
+        >
+          {status.ramCleaner === "running"
+            ? "Cleaning..."
+            : status.ramCleaner === "done"
+            ? "Cleaned ✅"
+            : "Clean RAM"}
+        </button>
+      </section>
+
+      {/* CPU/GPU Tweaks */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">CPU & GPU Tweaks</h3>
+        <p className="mb-3 text-gray-700">
+          Adjust CPU and GPU settings for better gaming performance.
+        </p>
+        <button
+          disabled={!backupCreated || status.cpuGpuTweaks === "running"}
+          onClick={() => runOptimization("cpuGpuTweaks")}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded"
+        >
+          {status.cpuGpuTweaks === "running"
+            ? "Applying..."
+            : status.cpuGpuTweaks === "done"
+            ? "Applied ✅"
+            : "Apply Tweaks"}
+        </button>
+      </section>
+
+      {/* Background Process Management */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">Background Process Management</h3>
+        <p className="mb-3 text-gray-700">
+          Select processes to terminate to free up system resources.
+        </p>
+        <div className="max-h-48 overflow-auto border rounded p-2 mb-2 bg-gray-50">
+          {processList.length === 0 ? (
+            <p className="text-gray-500 text-center">No background processes detected</p>
+          ) : (
+            processList.map(({ pid, name }) => (
+              <label
+                key={pid}
+                className="flex items-center space-x-2 mb-1 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedProcesses.includes(pid)}
+                  onChange={() => toggleProcessSelection(pid)}
+                  className="form-checkbox"
+                />
+                <span>{name} (PID: {pid})</span>
+              </label>
+            ))
+          )}
+        </div>
+        <button
+          onClick={killSelectedProcesses}
+          disabled={selectedProcesses.length === 0}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded"
+        >
+          Terminate Selected Processes
+        </button>
+      </section>
+    </div>
+  );
+}

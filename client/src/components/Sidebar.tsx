@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { Link } from "wouter";
 
 interface SidebarItem {
   href: string;
@@ -43,7 +44,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
           const isActive = location === item.href || (item.href === "/" && location === "/");
           
           return (
-            <a
+            <Link
               key={item.href}
               href={item.href}
               className={cn(
@@ -62,7 +63,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
               <span className={cn("font-medium", isActive ? "text-neon-green" : "text-white")}>
                 {item.label}
               </span>
-            </a>
+            </Link>
           );
         })}
       </nav>

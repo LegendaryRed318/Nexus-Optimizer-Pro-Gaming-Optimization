@@ -1,0 +1,118 @@
+import React, { useState, useEffect } from "react";
+
+export default function GpuTuning() {
+  // Placeholder initial state; replace with API data
+  const [gpuStats, setGpuStats] = useState({
+    temperature: 65,
+    usage: 48,
+    coreClock: 1500, // MHz
+    memoryClock: 7000, // MHz
+    fanSpeed: 40, // %
+  });
+
+  const [newCoreClock, setNewCoreClock] = useState(gpuStats.coreClock);
+  const [newFanSpeed, setNewFanSpeed] = useState(gpuStats.fanSpeed);
+  const [status, setStatus] = useState("idle");
+
+  // Fetch GPU stats from native agent
+  useEffect(() => {
+    // Example fetch, replace with real API call
+    // fetch('/api/gpu/stats').then(res => res.json()).then(setGpuStats);
+  }, []);
+
+  const applyTweaks = async () => {
+    setStatus("applying");
+    // Call native agent to apply core clock and fan speed
+    // Example API:
+    // await fetch('/api/gpu/tune', { method: 'POST', body: JSON.stringify({ coreClock: newCoreClock, fanSpeed: newFanSpeed }) });
+    setTimeout(() => {
+      setGpuStats((prev) => ({
+        ...prev,
+        coreClock: newCoreClock,
+        fanSpeed: newFanSpeed,
+      }));
+      setStatus("applied");
+    }, 2000);
+  };
+
+  const resetTweaks = () => {
+    setNewCoreClock(gpuStats.coreClock);
+    setNewFanSpeed(gpuStats.fanSpeed);
+    setStatus("idle");
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-8 font-sans text-gray-900">
+      <h2 className="text-3xl font-bold mb-4">GPU Tuning</h2>
+
+      {/* Current stats */}
+      <section className="border rounded p-4 shadow-sm grid grid-cols-2 gap-4 max-w-md">
+        <div>
+          <strong>Temperature:</strong> {gpuStats.temperature}°C
+        </div>
+        <div>
+          <strong>GPU Usage:</strong> {gpuStats.usage}%
+        </div>
+        <div>
+          <strong>Core Clock:</strong> {gpuStats.coreClock} MHz
+        </div>
+        <div>
+          <strong>Memory Clock:</strong> {gpuStats.memoryClock} MHz
+        </div>
+        <div>
+          <strong>Fan Speed:</strong> {gpuStats.fanSpeed}%
+        </div>
+      </section>
+
+      {/* Controls */}
+      <section className="border rounded p-4 shadow-sm max-w-md space-y-4">
+        <div>
+          <label className="block mb-1 font-semibold">Core Clock (MHz)</label>
+          <input
+            type="range"
+            min={gpuStats.coreClock - 200}
+            max={gpuStats.coreClock + 200}
+            value={newCoreClock}
+            onChange={(e) => setNewCoreClock(Number(e.target.value))}
+            className="w-full"
+          />
+          <div className="text-right text-gray-600">{newCoreClock} MHz</div>
+        </div>
+
+        <div>
+          <label className="block mb-1 font-semibold">Fan Speed (%)</label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={newFanSpeed}
+            onChange={(e) => setNewFanSpeed(Number(e.target.value))}
+            className="w-full"
+          />
+          <div className="text-right text-gray-600">{newFanSpeed}%</div>
+        </div>
+
+        <div className="flex space-x-4">
+          <button
+            onClick={applyTweaks}
+            disabled={status === "applying"}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:bg-gray-400"
+          >
+            {status === "applying" ? "Applying..." : "Apply Tweaks"}
+          </button>
+          <button
+            onClick={resetTweaks}
+            disabled={status === "applying"}
+            className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-gray-900 rounded"
+          >
+            Reset
+          </button>
+        </div>
+
+        {status === "applied" && (
+          <p className="text-green-600 font-semibold">Tweaks applied successfully!</p>
+        )}
+      </section>
+    </div>
+  );
+}

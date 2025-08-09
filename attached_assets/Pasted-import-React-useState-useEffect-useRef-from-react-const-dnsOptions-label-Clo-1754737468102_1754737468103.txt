@@ -1,0 +1,156 @@
+import React, { useState, useEffect, useRef } from "react";
+
+const dnsOptions = [
+  { label: "Cloudflare (1.1.1.1)", value: "1.1.1.1" },
+  { label: "Google DNS (8.8.8.8)", value: "8.8.8.8" },
+  { label: "Custom", value: "custom" },
+];
+
+export default function NetworkBooster() {
+  const [dnsServer, setDnsServer] = useState(dnsOptions[0].value);
+  const [customDns, setCustomDns] = useState("");
+  const [tcpOptimized, setTcpOptimized] = useState(false);
+  const [pingResults, setPingResults] = useState([]);
+  const [pingRunning, setPingRunning] = useState(false);
+  const pingInterval = useRef(null);
+
+  // Call native agent API to change DNS
+  const applyDnsChange = () => {
+    const dnsToApply = dnsServer === "custom" ? customDns : dnsServer;
+    if (!dnsToApply) {
+      alert("Please enter a valid DNS server.");
+      return;
+    }
+    // Call your native agent here with dnsToApply
+    alert(`Applying DNS server: ${dnsToApply}`);
+  };
+
+  // Call native agent API to toggle TCP optimization
+  const toggleTcpOptimization = () => {
+    // Call native agent here to enable/disable TCP optimizations
+    setTcpOptimized((prev) => !prev);
+  };
+
+  // Ping simulation function (replace with real ICMP API call)
+  const startPingTest = () => {
+    setPingRunning(true);
+    setPingResults([]);
+    pingInterval.current = setInterval(() => {
+      setPingResults((prev) => {
+        if (prev.length >= 20) {
+          clearInterval(pingInterval.current);
+          setPingRunning(false);
+          return prev;
+        }
+        // Simulate ping in ms (random for demo)
+        return [...prev, Math.floor(Math.random() * 40) + 10];
+      });
+    }, 500);
+  };
+
+  const stopPingTest = () => {
+    clearInterval(pingInterval.current);
+    setPingRunning(false);
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-8 font-sans text-gray-900">
+      <h2 className="text-3xl font-bold mb-4">Network Booster</h2>
+
+      {/* DNS Change */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">DNS Server Change</h3>
+        <p className="mb-3 text-gray-700">
+          Change your DNS server to speed up domain lookups and improve latency.
+        </p>
+        <select
+          className="border rounded p-2 mb-2 w-full max-w-xs"
+          value={dnsServer}
+          onChange={(e) => setDnsServer(e.target.value)}
+        >
+          {dnsOptions.map(({ label, value }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        {dnsServer === "custom" && (
+          <input
+            type="text"
+            placeholder="Enter custom DNS server IP"
+            className="border rounded p-2 mb-2 w-full max-w-xs"
+            value={customDns}
+            onChange={(e) => setCustomDns(e.target.value)}
+          />
+        )}
+        <button
+          onClick={applyDnsChange}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+        >
+          Apply DNS Change
+        </button>
+      </section>
+
+      {/* TCP Optimization */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">TCP Optimization</h3>
+        <p className="mb-3 text-gray-700">
+          Enable TCP/IP stack optimizations for better network throughput and
+          stability.
+        </p>
+        <button
+          onClick={toggleTcpOptimization}
+          className={`px-4 py-2 rounded text-white ${
+            tcpOptimized ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-700"
+          }`}
+        >
+          {tcpOptimized ? "Disable TCP Optimization" : "Enable TCP Optimization"}
+        </button>
+      </section>
+
+      {/* Ping Tester */}
+      <section className="border rounded p-4 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2">Ping Tester</h3>
+        <p className="mb-3 text-gray-700">
+          Test your network latency to popular game servers or custom IPs.
+        </p>
+        <div className="flex space-x-4 mb-3">
+          <button
+            disabled={pingRunning}
+            onClick={startPingTest}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
+          >
+            Start Test
+          </button>
+          <button
+            disabled={!pingRunning}
+            onClick={stopPingTest}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+          >
+            Stop Test
+          </button>
+        </div>
+        <div className="h-32 bg-gray-100 rounded p-2 overflow-x-auto whitespace-nowrap">
+          {pingResults.length === 0 && (
+            <p className="text-gray-400 text-center">No ping data yet</p>
+          )}
+          {pingResults.map((ping, i) => (
+            <div
+              key={i}
+              className="inline-block mx-1 bg-indigo-500 text-white px-2 rounded"
+              style={{ height: `${Math.min(ping * 2, 64)}px`, verticalAlign: "bottom" }}
+              title={`${ping} ms`}
+            >
+              &nbsp;
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-gray-600">
+          {pingResults.length > 0
+            ? `Latest ping: ${pingResults[pingResults.length - 1]} ms`
+            : ""}
+        </p>
+      </section>
+    </div>
+  );
+}
