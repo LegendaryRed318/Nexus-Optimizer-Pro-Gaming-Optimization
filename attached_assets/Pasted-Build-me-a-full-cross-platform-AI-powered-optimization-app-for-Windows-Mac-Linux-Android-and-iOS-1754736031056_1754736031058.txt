@@ -1,0 +1,106 @@
+Build me a full cross-platform AI-powered optimization app for Windows, Mac, Linux, Android, and iOS.
+
+### Name:
+Nexus Optimizer Pro (sleek, gamer-friendly brand identity)
+
+### Design Inspiration:
+Take UI/UX inspiration from:
+- Razer Cortex – gamer-focused neon accents, animated stats.
+- Surge – clean optimization modules with smooth animations.
+- EXM Tweaks – powerful but accessible tweak tools.
+- NVIDIA GeForce Experience – game-specific optimization menus.
+
+Design must:
+- Default to dark mode with toggle for light mode.
+- Neon glow accents (green, blue, customizable).
+- Real-time hardware monitoring widgets (CPU, GPU, RAM, Network).
+- Modular optimization cards for System, Network, GPU, and Games.
+- Animated transitions and hover effects.
+- Sidebar navigation with icons + text labels.
+
+---
+
+### Core Features
+
+#### 1. AI Chatbot
+- Accepts commands like “Optimize for Fortnite”, “Reduce ping for Valorant”, “Free up RAM”.
+- Explains tweaks in plain language.
+- Learning Mode improves results over time.
+- Scan & Report: full system diagnostics.
+- Predictive Optimization: detects bottlenecks before they happen.
+
+#### 2. System Optimizer
+- Temporary file cleanup.
+- Registry tweaks (Windows).
+- Startup manager.
+- RAM cleaner.
+- CPU/GPU tweaks.
+- Background process management.
+
+#### 3. Network Booster
+- Change DNS to Cloudflare, Google, or custom.
+- TCP optimization.
+- Ping tester with live graph.
+- Packet routing optimization.
+
+#### 4. GPU Tuner
+- NVIDIA, AMD, Intel API integration.
+- Resolution scaling.
+- Game profile optimization.
+
+#### 5. Gaming Optimization
+- Presets for Fortnite, Valorant, Call of Duty, Minecraft, Apex Legends.
+- Auto-apply tweaks when game launches.
+
+#### 6. Device Battery & Health
+- Battery saver modes.
+- Hardware temperature and health monitoring.
+
+---
+
+### 7. FPS Overlay Module
+**Purpose:** Provide a built-in, real-time performance overlay without third-party tools.
+
+**Core Stats Display:**
+- FPS
+- CPU usage %
+- GPU usage %
+- RAM usage %
+- CPU temperature
+- GPU temperature
+- Network ping
+
+**Customization:**
+- Position: top-left, top-right, bottom-left, bottom-right.
+- Font size and color options.
+- Background opacity (0%–60%).
+- Toggle elements on/off.
+- Theme presets (minimal, full detail, retro, neon).
+
+**Hotkeys:**
+- Toggle overlay: CTRL+SHIFT+O (Win/Linux), CMD+SHIFT+O (Mac).
+- Cycle positions: CTRL+SHIFT+P.
+- Hide/show via chatbot commands.
+
+**Performance:**
+- Lightweight thread/process.
+- CPU < 1%, GPU < 0.5% usage.
+- Low-level hooking:
+  - Windows: DirectX & OpenGL.
+  - Mac: Metal API.
+  - Linux: Vulkan/OpenGL.
+- Auto-refresh to match monitor refresh rate (max 144Hz).
+
+**Integration:**
+- Works with DirectX, Vulkan, OpenGL, Metal games.
+- Chatbot can report overlay stats.
+- Logs data for performance history.
+
+**Extras:**
+- Animated “monitoring active” icon.
+- Optional FPS/ping mini-graph.
+- No admin rights needed for toggle.
+
+**UI Example:**
+Minimal → `FPS: 144 | Ping: 18ms`  
+Full →  

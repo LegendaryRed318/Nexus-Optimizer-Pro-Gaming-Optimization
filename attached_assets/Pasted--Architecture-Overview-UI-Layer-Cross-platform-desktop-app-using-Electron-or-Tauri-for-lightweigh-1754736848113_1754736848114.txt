@@ -1,0 +1,133 @@
+. Architecture Overview
+UI Layer: Cross-platform desktop app using Electron or Tauri (for lightweight native builds) + React or Flutter for mobile.
+
+Local System Agent: Native background service/agent written in C++ or Rust for:
+
+Running system commands/scripts
+
+Accessing hardware sensors
+
+Managing GPU vendor APIs
+
+Overlay injection and hooking
+
+AI Integration: Cloud API calls to GPT/Claude for chatbot, learning mode, and optimization suggestions.
+
+Communication: UI ↔ Agent via local HTTP/gRPC interface.
+
+Security: Admin privileges requested only when needed; all tweaks reversible with backups.
+
+2. Feature Implementation Details
+A. System Optimization
+Feature	APIs/Tools/Commands	Notes
+Temp File Cleanup	Windows: PowerShell scripts (Remove-Item $env:TEMP\*)	Use Storage Sense APIs if possible
+Registry Tweaks	Windows PowerShell + reg.exe	Backup before edits
+Startup Manager	WMI (Win32_StartupCommand), Task Scheduler (schtasks)	Provide disable/enable UI
+RAM Cleaner	Windows API: EmptyWorkingSet() in native DLL	Only suggests, not magic cleanup
+CPU/GPU Tweaks	Windows: Vendor SDKs (NVAPI/ADL); Mac/Linux: system calls	Direct hardware control
+Background Process Mgmt	WMI + native process control	Warn users before killing processes
+
+B. Network Optimization
+Feature	APIs/Tools/Commands	Notes
+DNS Change	Windows: netsh interface ip set dns	Provide preset options (Cloudflare/Google)
+TCP Optimization	Registry edits (Windows), sysctl on Linux/macOS	Must be reversible
+Ping Tester	ICMP sockets (native code) or CLI ping	Show live graphs
+Packet Routing	Router QoS config (optional companion app or manual)	Highly device dependent
+
+C. GPU Tuning and Monitoring
+Feature	APIs/Tools/Commands	Notes
+NVIDIA	NVAPI SDK (C/C++)	Controls clock speeds, temps, fans
+AMD	ADLX / ADL SDK	Similar to NVAPI
+Intel Integrated GPU	Intel Level Zero / PTI SDK	Read metrics
+GPU Temp & Usage	Vendor APIs + LibreHardwareMonitor	Combine for accuracy
+
+D. Hardware Sensors & Readings
+Platform	APIs/Tools	Notes
+Windows	WMI (CPU/RAM), LibreHardwareMonitor (temp)	Most accurate with LibreHWMon
+macOS	IOKit, SMC interface, powermetrics	Apple hardware monitoring tools
+Linux	/proc, /sys/class/thermal/, nvidia-smi	Open-source tools MangoHud
+
+E. FPS Overlay
+Platform	Methods/Tools/Libs	Notes
+Windows	Hook DirectX/OpenGL with DLL injection, use Dear ImGui for rendering; PresentMon for FPS capture	Must sign binaries; minimal impact
+macOS	Transparent NSWindow overlay or Metal APIs	Limited overlay capability
+Linux	Vulkan/OpenGL overlay injection (MangoHud)	Open-source example
+
+F. Console Optimization
+Direct OS-level optimization on consoles is not possible without devkit access.
+
+Build companion apps to optimize network (ping, QoS, DNS) for consoles.
+
+Provide user instructions for wired connections, port forwarding.
+
+3. Security & Reliability
+Request elevation only for necessary actions.
+
+Maintain rollback functionality: backups before every tweak.
+
+Code sign executables and DLLs to reduce antivirus issues.
+
+Provide audit logs of all system changes.
+
+Gracefully handle failures & conflicts.
+
+4. Testing & Validation
+Cross-check sensor data vs trusted tools (MSI Afterburner, HWInfo, MangoHud).
+
+Validate overlay FPS using PresentMon traces.
+
+Test performance impact under load; auto-disable if impact >3%.
+
+Confirm compatibility with major anti-cheat software.
+
+Beta test on diverse hardware.
+
+5. Development Stack Recommendations
+Layer	Tech Stack
+Native Agent	C++ or Rust (NVAPI/ADL integration)
+Scripts	PowerShell (Windows), Bash (macOS/Linux)
+UI	Electron or Tauri + React/Flutter
+AI Integration	OpenAI GPT or Anthropic Claude via API
+Communication	gRPC or REST API (local)
+
+6. Where to Find Developers
+Freelance Platforms: Upwork, Fiverr, Freelancer (filter for systems programmers).
+
+Premium Talent: Toptal (rigorous screening, higher cost).
+
+Open Source Communities: GitHub (search for NVAPI, MangoHud contributors).
+
+AI Builders: Replit Agent, Create.xyz (for prototyping).
+
+Local Tech Communities: Meetups or forums related to Windows system programming or game dev.
+
+7. Free Optimizations & Tools to Get Started
+Change DNS: netsh interface ip set dns "Ethernet" static 1.1.1.1
+
+Disable unnecessary startup programs (Task Manager).
+
+Enable Windows Game Mode.
+
+Use MSI Afterburner (free) for GPU monitoring and basic OC.
+
+MangoHud on Linux for overlays.
+
+LibreHardwareMonitor on Windows for sensor validation.
+
+8. Deliverables to Require From Developers
+Native modules (C++/Rust) with unit tests.
+
+Local agent exposing sensor data and executing tweaks.
+
+Low-latency, low-overhead overlay with hotkeys.
+
+Undo/restore system for all changes.
+
+Cross-platform UI with clean UX.
+
+AI chatbot integrated with tweak logic.
+
+Complete documentation (architecture, API, user guide).
+
+Signed, installable builds for Windows, macOS, Linux.
+
