@@ -18,6 +18,11 @@ const sidebarItems: SidebarItem[] = [
   { href: "/network", icon: "fas fa-wifi", label: "Network Booster", color: "text-neon-blue" },
   { href: "/gpu", icon: "fas fa-display", label: "GPU Tuner", color: "text-neon-green" },
   { href: "/fortnite", icon: "fas fa-gamepad", label: "Fortnite Optimizer", color: "text-blue-400" },
+  { href: "/restore", icon: "fas fa-history", label: "Restore Points", color: "text-neon-yellow" },
+  { href: "/bios", icon: "fas fa-microchip", label: "BIOS Tweaks", color: "text-neon-purple" },
+  { href: "/audio", icon: "fas fa-volume-up", label: "Audio Tweaks", color: "text-neon-blue" },
+  { href: "/ram", icon: "fas fa-memory", label: "RAM Tweaks", color: "text-neon-green" },
+  { href: "/misc", icon: "fas fa-tools", label: "Misc Mods", color: "text-neon-yellow" },
   { href: "/settings", icon: "fas fa-cog", label: "Settings", color: "text-neon-yellow" },
 ];
 
@@ -57,6 +62,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
             >
               <i
                 className={cn(
+                  item.icon,
                   "text-lg mr-3 transition-all duration-300 group-hover:scale-110",
                   isActive ? "text-neon-green neon-glow" : item.color
                 )}
