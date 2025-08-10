@@ -4,7 +4,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { StatCard } from "@/components/StatCard";
 import { OptimizationCard } from "@/components/OptimizationCard";
 import { AIAssistant } from "@/components/AIAssistant";
-import { FPSOverlay } from "@/components/FPSOverlay";
+import FPSOverlay from "@/components/FPSOverlay";
+import OptimizationChatbot from "@/components/OptimizationChatbot";
 import { PremiumTiers } from "@/components/PremiumTiers";
 import { Settings } from "@/components/Settings";
 import { Button } from "@/components/ui/button";
@@ -197,8 +198,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* FPS Overlay */}
-          <FPSOverlay systemStats={systemStats} />
+          {/* Gaming Tools */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <FPSOverlay />
+            <OptimizationChatbot />
+          </div>
 
           {/* Premium Tiers */}
           <PremiumTiers />
