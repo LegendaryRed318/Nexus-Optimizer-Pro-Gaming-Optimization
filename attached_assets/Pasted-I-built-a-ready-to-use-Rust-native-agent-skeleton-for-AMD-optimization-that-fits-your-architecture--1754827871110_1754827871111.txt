@@ -1,0 +1,295 @@
+I built a ready-to-use Rust native agent skeleton for AMD optimization that fits your architecture.
+Drop this into your project (or give it to a dev) and they can quickly replace the mock parts with real ADLX/ADL calls (or FFI to a C++ helper) to control AMD GPUs.
+
+What you get here:
+
+actix-web server with endpoints your UI can call:
+
+GET /api/amd/gpu/stats — returns GPU temps/usages/clocks (mock)
+
+POST /api/amd/gpu/apply — generic apply actions (fps_cap, fan_speed, power_limit)
+
+POST /api/amd/gpu/fan — set fan %
+
+POST /api/amd/gpu/fps — set FPS cap (FRTC)
+
+POST /api/amd/gpu/power — set power limit
+
+POST /api/amd/gpu/preset — apply named preset (e.g., "fortnite_perf")
+
+POST /api/amd/gpu/reset — revert changes (mock)
+
+Clear TODOs and comments where to integrate AMD ADLX/ADL or a C++ helper.
+
+Simple in-memory state and safe responses so the UI works immediately.
+
+How to use
+Install Rust toolchain.
+
+Create a new project and paste the code below into src/main.rs.
+
+Add dependencies to Cargo.toml (I list them after the code).
+
+cargo run
+
+The agent serves http://127.0.0.1:5051 and your UI can call the endpoints.
+
+Code — src/main.rs
+rust
+Copy
+Edit
+// src/main.rs
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+
+static STATE: Lazy<Mutex<AmdState>> = Lazy::new(|| Mutex::new(AmdState::default()));
+
+#[derive(Default)]
+struct AmdState {
+    fps_cap: Option<u32>,
+    fan_percent: Option<u8>,
+    power_limit_watts: Option<u32>,
+    last_preset: Option<String>,
+}
+
+#[derive(Serialize)]
+struct GpuStats {
+    name: String,
+    temperature_c: f32,
+    gpu_usage_pct: u8,
+    memory_usage_mb: u32,
+    core_clock_mhz: u32,
+    memory_clock_mhz: u32,
+    fan_rpm: u32,
+    driver_version: String,
+}
+
+// Simple GET endpoint returning mocked GPU stats.
+// TODO: Replace mock values with ADLX/ADL queries (or FFI to C++ wrapper).
+#[get("/api/amd/gpu/stats")]
+async fn get_gpu_stats() -> impl Responder {
+    let stats = GpuStats {
+        name: "AMD Radeon MockGPU".to_string(),
+        temperature_c: 64.5,
+        gpu_usage_pct: 47,
+        memory_usage_mb: 3184,
+        core_clock_mhz: 2100,
+        memory_clock_mhz: 1600,
+        fan_rpm: 2200,
+        driver_version: "Adrenalin 25.XX".to_string(),
+    };
+    HttpResponse::Ok().json(stats)
+}
+
+#[derive(Deserialize)]
+struct ApplyRequest {
+    action: String,                     // e.g., "fps_cap" | "fan" | "power_limit" | "preset"
+    payload: Option<serde_json::Value>, // action-specific
+}
+
+// Generic apply endpoint (delegates to specific handlers)
+#[post("/api/amd/gpu/apply")]
+async fn post_apply(req: web::Json<ApplyRequest>) -> impl Responder {
+    match req.action.as_str() {
+        "fps_cap" => {
+            if let Some(payload) = &req.payload {
+                if let Some(fps) = payload.get("fps").and_then(|v| v.as_u64()) {
+                    return set_fps_impl(fps as u32).await;
+                }
+            }
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"ok": false, "msg": "missing fps in payload"}));
+        }
+        "fan" => {
+            if let Some(payload) = &req.payload {
+                if let Some(pct) = payload.get("percent").and_then(|v| v.as_u64()) {
+                    return set_fan_impl(pct as u8).await;
+                }
+            }
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"ok": false, "msg": "missing percent in payload"}));
+        }
+        "power_limit" => {
+            if let Some(payload) = &req.payload {
+                if let Some(watts) = payload.get("watts").and_then(|v| v.as_u64()) {
+                    return set_power_impl(watts as u32).await;
+                }
+            }
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"ok": false, "msg": "missing watts in payload"}));
+        }
+        "preset" => {
+            if let Some(payload) = &req.payload {
+                if let Some(p) = payload.get("name").and_then(|v| v.as_str()) {
+                    return apply_preset_impl(p.to_string()).await;
+                }
+            }
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"ok": false, "msg": "missing preset name"}));
+        }
+        _ => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"ok": false, "msg": "unknown action"}));
+        }
+    }
+}
+
+// Specific endpoints (optional convenience)
+#[derive(Deserialize)]
+struct FpsPayload { fps: u32 }
+
+#[post("/api/amd/gpu/fps")]
+async fn post_fps(info: web::Json<FpsPayload>) -> impl Responder {
+    set_fps_impl(info.fps).await
+}
+
+#[derive(Deserialize)]
+struct FanPayload { percent: u8 }
+
+#[post("/api/amd/gpu/fan")]
+async fn post_fan(info: web::Json<FanPayload>) -> impl Responder {
+    set_fan_impl(info.percent).await
+}
+
+#[derive(Deserialize)]
+struct PowerPayload { watts: u32 }
+
+#[post("/api/amd/gpu/power")]
+async fn post_power(info: web::Json<PowerPayload>) -> impl Responder {
+    set_power_impl(info.watts).await
+}
+
+#[derive(Deserialize)]
+struct PresetPayload { name: String }
+
+#[post("/api/amd/gpu/preset")]
+async fn post_preset(info: web::Json<PresetPayload>) -> impl Responder {
+    apply_preset_impl(info.name.clone()).await
+}
+
+#[post("/api/amd/gpu/reset")]
+async fn post_reset() -> impl Responder {
+    // TODO: implement restore from backups (ADLX/ADL or saved profiles)
+    let mut s = STATE.lock().unwrap();
+    s.fps_cap = None;
+    s.fan_percent = None;
+    s.power_limit_watts = None;
+    s.last_preset = None;
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "msg": "reset to defaults (mock)"}))
+}
+
+// --- Implementation helpers (mock) ---
+// Replace bodies with real ADLX/ADL calls. Ensure operations are atomic: backup -> apply -> verify.
+
+async fn set_fps_impl(fps: u32) -> HttpResponse {
+    let allowed = [180u32, 144, 120, 100, 60, 30];
+    if !allowed.contains(&fps) {
+        return HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "unsupported fps"}));
+    }
+
+    // TODO: Integrate ADLX: SetFRTC or ADL equivalent for FRTC
+    // On success:
+    {
+        let mut s = STATE.lock().unwrap();
+        s.fps_cap = Some(fps);
+    }
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "fps": fps}))
+}
+
+async fn set_fan_impl(percent: u8) -> HttpResponse {
+    if percent > 100 {
+        return HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "invalid percent"}));
+    }
+
+    // TODO: call ADLX IGPUFanTuning->SetFixedFanSpeed or fan curve adjustment
+    {
+        let mut s = STATE.lock().unwrap();
+        s.fan_percent = Some(percent);
+    }
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "fan_percent": percent}))
+}
+
+async fn set_power_impl(watts: u32) -> HttpResponse {
+    // Validate plausible watt range per GPU (implement device-specific checks)
+    if watts == 0 || watts > 5000 {
+        return HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "invalid watts"}));
+    }
+
+    // TODO: call ADLX IGPUPowerTuning->SetPowerLimit or ADL API
+    {
+        let mut s = STATE.lock().unwrap();
+        s.power_limit_watts = Some(watts);
+    }
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "power_watts": watts}))
+}
+
+async fn apply_preset_impl(name: String) -> HttpResponse {
+    // Example: "fortnite_perf", "balanced", "silent"
+    // TODO: implement actual preset steps (fps cap, fan curve, power limit, image sharpening)
+    {
+        let mut s = STATE.lock().unwrap();
+        s.last_preset = Some(name.clone());
+    }
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "applied": name}))
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let addr = "127.0.0.1:5051";
+    println!("AMD agent listening at http://{}", addr);
+
+    HttpServer::new(|| {
+        App::new()
+            .service(get_gpu_stats)
+            .service(post_apply)
+            .service(post_fps)
+            .service(post_fan)
+            .service(post_power)
+            .service(post_preset)
+            .service(post_reset)
+    })
+    .bind(addr)?
+    .run()
+    .await
+}
+Cargo.toml deps
+Add these to your Cargo.toml:
+
+toml
+Copy
+Edit
+[dependencies]
+actix-web = "4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+once_cell = "1.17"
+Next steps for production integration (what the developer should do)
+Integrate ADLX/ADL:
+
+ADLX is AMD's newer SDK. Use it to query temps, clocks, fan, and to set FRTC, fan curves, power limits, Anti-Lag, etc.
+
+Options:
+
+Call ADLX from Rust via C FFI (create a thin C wrapper if ADLX is C++-only).
+
+Or implement a small C++ helper binary that performs privileged operations; call it from Rust (IPC or spawn).
+
+Backup & Verify: Before applying any change, backup the current profile/state (ADLX read and write to a backup JSON) and verify post-apply values.
+
+Admin elevation: Driver-level changes require admin privileges or signed drivers. Implement an elevated helper or prompt the user (UAC) for those actions.
+
+Error handling & retries: Add robust error handling — ADLX calls can fail if drivers are outdated or GPU is busy.
+
+Anti-cheat caution: Provide overlay/tweak safe-mode and a per-game toggle to disable overlay or automation for anti-cheat protected titles.
+
+Unit tests & QA: Compare stats with trusted tools (Radeon Software, HWInfo) during QA. Create automated checks.
+
+If you want, I can:
+
+Produce a C++ ADLX example showing exactly how to set FRTC / fan / power limit (helpful if you plan to call it via FFI).
+
+Update the Rust agent to call that C++ helper (spawn process + JSON IPC).
+
+Create a small UI sample to call these new AMD endpoints.

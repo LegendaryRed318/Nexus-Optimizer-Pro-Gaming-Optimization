@@ -1,0 +1,115 @@
+We’ll use AMD’s ADLX SDK (newer, cross-platform) or ADL SDK (older, Windows only) for things like clock adjustments, fan curves, and FPS caps.
+
+AMD GPU Optimization – Technical Blueprint
+1. Architecture
+Local Agent: C++ or Rust module that links against AMD’s ADLX SDK.
+
+UI: Your Electron/Tauri frontend sends commands to the local agent via HTTP/gRPC.
+
+Security: Admin rights needed for hardware control.
+
+Fallback: If SDK not found, use Radeon Software CLI automation (Registry + JSON configs).
+
+2. Features & APIs
+Feature	AMD API / Command	Notes
+FPS Cap	I3DSettings::SetFRTC() via ADLX	Can set per-profile or global FPS limit
+GPU Clock Control	IOverdriveN (ADL) / IGPUClocks (ADLX)	Adjust core/memory MHz
+Fan Curve Control	IGPUFanTuning (ADLX)	Change fan speeds per temp range
+Temp Monitoring	IGPUThermal (ADLX)	Real-time temp in °C
+Power Limit	IGPUPowerTuning (ADLX)	Change wattage for perf/efficiency
+Radeon Anti-Lag Toggle	ADLX IFeatureControl	Reduces input latency
+Image Sharpening Toggle	ADLX IImageEnhancement	For better visuals without perf drop
+VRAM Usage	ADLX IMemoryUsage	Useful for monitoring in overlay
+
+3. Example – C++ AMD Optimization Agent
+cpp
+Copy
+Edit
+#include "ADLX.h"
+#include <iostream>
+
+using namespace adlx;
+
+int main() {
+    // Initialize ADLX
+    if (ADLXHelper::Initialize() != ADLX_OK) {
+        std::cout << "❌ Failed to init ADLX" << std::endl;
+        return -1;
+    }
+
+    IADLXSystem* sys = nullptr;
+    ADLXHelper::GetSystem(&sys);
+
+    // Get first GPU
+    IADLXGPUList* gpuList = nullptr;
+    sys->GetGPUs(&gpuList);
+    IADLXGPU* gpu = nullptr;
+    gpuList->At(0, &gpu);
+
+    // FPS cap example
+    IADLX3DSettings* settings = nullptr;
+    gpu->QueryInterface(IID_IADLX3DSettings(), (void**)&settings);
+    settings->SetFRTC(144); // Set FPS cap to 144
+
+    // Fan control example
+    IADLXFanTuning* fanTuning = nullptr;
+    gpu->QueryInterface(IID_IADLXFanTuning(), (void**)&fanTuning);
+    fanTuning->SetFixedFanSpeed(70); // 70% fan speed
+
+    // Cleanup
+    gpu->Release();
+    gpuList->Release();
+    ADLXHelper::Terminate();
+
+    std::cout << "✅ AMD Optimization Applied" << std::endl;
+    return 0;
+}
+4. Global FPS Limit for AMD
+If you want a global FPS limit without SDK programming:
+
+Radeon Settings → Gaming → Global Graphics → Frame Rate Target Control (FRTC).
+
+You can automate this by editing Radeon’s profile JSONs at:
+
+shell
+Copy
+Edit
+%localappdata%\AMD\CN
+…and restarting the AMD display driver.
+
+5. Python Fallback (No SDK)
+If you just want to set FPS cap without installing ADLX SDK:
+
+python
+Copy
+Edit
+import os
+import json
+
+radeon_config_path = os.path.expandvars(r"%localappdata%\AMD\CN\profiles.json")
+
+def set_fps_cap(fps):
+    if not os.path.exists(radeon_config_path):
+        raise FileNotFoundError("Radeon config not found")
+    
+    with open(radeon_config_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    # Modify FPS cap in profiles
+    data["GlobalSettings"]["FRTC"] = fps
+
+    with open(radeon_config_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+    os.system("devcon restart =display")  # Restart AMD driver
+    print(f"✅ FPS Cap set to {fps}")
+
+set_fps_cap(144)
+6. Overlay Integration
+For FPS, temp, and usage overlay:
+
+Hook Present() calls in DirectX via injected DLL (Dear ImGui overlay).
+
+Query temps & clocks from ADLX in real-time.
+
+Use same hotkey system as NVIDIA/Intel overlay.
