@@ -18,6 +18,11 @@ import {
   getOptionalUserId,
   type AuthenticatedRequest 
 } from "./auth";
+import si from "systeminformation";
+import { exec as execCb } from "child_process";
+import { promisify } from "util";
+
+const exec = promisify(execCb);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -154,6 +159,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // System Info (one-shot details)
+  app.get("/api/system-info", async (_req, res) => {
+    try {
+      const [cpu, mem, gpu, os] = await Promise.all([
+        si.cpu(),
+        si.mem(),
+        si.graphics(),
+        si.osInfo(),
+      ]);
+
+      const info = {
+        cpu: `${cpu.manufacturer} ${cpu.brand}`.trim(),
+        ramUsed: (mem.active / 1024 / 1024 / 1024).toFixed(2) + " GB",
+        ramTotal: (mem.total / 1024 / 1024 / 1024).toFixed(2) + " GB",
+        gpu: (gpu.controllers || []).map((c) => c.model).join(", ") || "",
+        os: `${os.distro} ${os.release}`.trim(),
+      };
+      res.json(info);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get system info", details: String(error?.message || error) });
+    }
+  });
+
+  // RAM Cleaner
+  app.post("/api/ram/clean", async (_req, res) => {
+    try {
+      const platform = process.platform; // 'win32' | 'darwin' | 'linux'
+      let command: string | null = null;
+
+      if (platform === "win32") {
+        // Requires EmptyStandbyList.exe in PATH or known location
+        command = "EmptyStandbyList.exe workingsets";
+      } else if (platform === "darwin") {
+        // macOS
+        command = "sudo purge";
+      } else if (platform === "linux") {
+        // Linux - attempt to drop page cache (requires root)
+        command = "sudo sh -c 'sync; echo 1 > /proc/sys/vm/drop_caches'";
+      }
+
+      if (!command) {
+        return res.status(400).json({ success: false, message: "Unsupported platform" });
+      }
+
+      try {
+        const { stdout, stderr } = await exec(command);
+        res.json({ success: true, stdout, stderr });
+      } catch (err: any) {
+        res.status(500).json({ success: false, message: "Failed to clean RAM", details: String(err?.message || err) });
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "RAM clean error", details: String(error?.message || error) });
+    }
+  });
+
+  // Network: Change DNS
+  app.post("/api/network/dns", async (req, res) => {
+    const { interface: iface, servers } = req.body as { interface?: string; servers: string[] };
+    if (!servers || !Array.isArray(servers) || servers.length === 0) {
+      return res.status(400).json({ success: false, message: "servers array required" });
+    }
+
+    const platform = process.platform;
+    try {
+      if (platform === "win32") {
+        // netsh interface ip set dns "Wi-Fi" static 1.1.1.1
+        const target = iface || "Wi-Fi";
+        const primary = servers[0];
+        const secondary = servers[1];
+        await exec(`netsh interface ip set dns \"${target}\" static ${primary}`);
+        if (secondary) {
+          await exec(`netsh interface ip add dns \"${target}\" ${secondary} index=2`);
+        }
+      } else if (platform === "darwin") {
+        // macOS networksetup
+        const service = iface || "Wi-Fi";
+        await exec(`networksetup -setdnsservers \"${service}\" ${servers.join(" ")}`);
+      } else if (platform === "linux") {
+        // Try NetworkManager via nmcli; otherwise fallback is not safe here
+        try {
+          const conName = iface || (await exec("nmcli -t -f NAME connection show --active")).stdout.split("\n")[0];
+          if (conName) {
+            await exec(`nmcli connection modify \"${conName}\" ipv4.dns \"${servers.join(" ")}\"`);
+            await exec(`nmcli connection up \"${conName}\"`);
+          } else {
+            throw new Error("No active connection found via nmcli");
+          }
+        } catch (e) {
+          return res.status(501).json({ success: false, message: "DNS change requires NetworkManager (nmcli) or admin rights" });
+        }
+      } else {
+        return res.status(400).json({ success: false, message: "Unsupported platform" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "Failed to change DNS", details: String(error?.message || error) });
+    }
+  });
+
+  // Network: Flush DNS cache
+  app.post("/api/network/flush", async (_req, res) => {
+    const platform = process.platform;
+    try {
+      if (platform === "win32") {
+        await exec("ipconfig /flushdns");
+      } else if (platform === "darwin") {
+        await exec("dscacheutil -flushcache");
+        await exec("sudo killall -HUP mDNSResponder");
+      } else if (platform === "linux") {
+        // systemd-resolved
+        try {
+          await exec("sudo systemd-resolve --flush-caches");
+        } catch {
+          try {
+            await exec("sudo resolvectl flush-caches");
+          } catch {
+            // Fallback: restart nscd or dnsmasq if present (best-effort)
+            try { await exec("sudo service nscd restart"); } catch {}
+            try { await exec("sudo service dnsmasq restart"); } catch {}
+          }
+        }
+      } else {
+        return res.status(400).json({ success: false, message: "Unsupported platform" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "Failed to flush DNS cache", details: String(error?.message || error) });
+    }
+  });
+
   // API Routes
   app.get("/api/system-stats", optionalAuth, async (req: AuthenticatedRequest, res) => {
     try {
@@ -261,25 +398,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   async function sendSystemStats(ws: WebSocket) {
     try {
-      // Generate realistic mock data
-      const mockStats = {
-        cpuUsage: Math.floor(Math.random() * 20) + 35, // 35-55%
-        cpuTemp: Math.floor(Math.random() * 15) + 55, // 55-70°C
-        gpuUsage: Math.floor(Math.random() * 30) + 60, // 60-90%
-        gpuTemp: Math.floor(Math.random() * 20) + 65, // 65-85°C
-        ramUsed: (Math.random() * 2 + 7).toFixed(1), // 7-9GB
-        ramAvailable: (Math.random() * 2 + 6).toFixed(1), // 6-8GB
-        networkPing: Math.floor(Math.random() * 10) + 15, // 15-25ms
-        networkUpload: Math.floor(Math.random() * 50) + 100, // 100-150 Mbps
-        networkDownload: Math.floor(Math.random() * 100) + 200, // 200-300 Mbps
-        fps: Math.floor(Math.random() * 30) + 120, // 120-150 fps
+      const [load, temp, mem, graphics] = await Promise.all([
+        si.currentLoad(),
+        si.cpuTemperature(),
+        si.mem(),
+        si.graphics(),
+      ]);
+
+      const controller = (graphics.controllers && graphics.controllers[0]) || undefined;
+
+      const stats = {
+        cpuUsage: Math.max(0, Math.min(100, Math.round(load.currentLoad || 0))),
+        cpuTemp: Math.round((temp.main || 0)),
+        gpuUsage: Math.max(0, Math.min(100, Math.round((controller as any)?.utilizationGpu ?? 0))),
+        gpuTemp: Math.round((controller as any)?.temperatureGpu ?? 0),
+        ramUsed: (mem.used / 1024 / 1024 / 1024).toFixed(1),
+        ramAvailable: (mem.available / 1024 / 1024 / 1024).toFixed(1),
+        networkPing: 0,
+        networkUpload: 0,
+        networkDownload: 0,
+        fps: 0,
       };
 
       // Store in memory
-      await storage.createSystemStats(mockStats);
+      await storage.createSystemStats(stats);
 
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'systemStats', data: mockStats }));
+        ws.send(JSON.stringify({ type: 'systemStats', data: stats }));
       }
     } catch (error) {
       console.error('Error sending system stats:', error);

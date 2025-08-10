@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
 const dnsOptions = [
   { label: "Cloudflare DNS", value: "1.1.1.1", description: "Fast and privacy-focused" },
@@ -15,6 +16,7 @@ const dnsOptions = [
 export default function NetworkBooster() {
   const [dnsServer, setDnsServer] = useState(dnsOptions[0].value);
   const [customDns, setCustomDns] = useState("");
+  const [interfaceName, setInterfaceName] = useState("Wi-Fi");
   const [tcpOptimized, setTcpOptimized] = useState(false);
   const [pingResults, setPingResults] = useState<number[]>([]);
   const [pingRunning, setPingRunning] = useState(false);
@@ -23,7 +25,7 @@ export default function NetworkBooster() {
   
   const { toast } = useToast();
 
-  const applyDnsChange = () => {
+  const applyDnsChange = async () => {
     const dnsToApply = dnsServer === "custom" ? customDns : dnsServer;
     if (!dnsToApply) {
       toast({
@@ -33,21 +35,37 @@ export default function NetworkBooster() {
       });
       return;
     }
-    
-    toast({
-      title: "DNS Server Updated",
-      description: `Successfully switched to ${dnsToApply}. Network lookups should be faster now.`,
-    });
+
+    try {
+      await apiRequest("POST", "/api/network/dns", {
+        interface: interfaceName || undefined,
+        servers: [dnsToApply, dnsToApply === "1.1.1.1" ? "1.0.0.1" : dnsToApply === "8.8.8.8" ? "8.8.4.4" : undefined].filter(Boolean),
+      });
+      toast({
+        title: "DNS Server Updated",
+        description: `Switched to ${dnsToApply}. You may need admin rights on some OSes.`,
+      });
+    } catch (e: any) {
+      toast({ title: "DNS Change Failed", description: String(e.message || e), variant: "destructive" });
+    }
+  };
+
+  const flushDns = async () => {
+    try {
+      await apiRequest("POST", "/api/network/flush");
+      toast({ title: "DNS Cache Flushed", description: "Resolver cache cleared successfully." });
+    } catch (e: any) {
+      toast({ title: "Flush Failed", description: String(e.message || e), variant: "destructive" });
+    }
   };
 
   const toggleTcpOptimization = () => {
     setTcpOptimized((prev) => !prev);
-    
     toast({
       title: tcpOptimized ? "TCP Optimization Disabled" : "TCP Optimization Enabled",
       description: tcpOptimized 
         ? "TCP settings have been reverted to default."
-        : "Applied advanced TCP tweaks for better gaming performance.",
+        : "Applied advanced TCP tweaks for better gaming performance (mock).",
     });
   };
 
@@ -143,13 +161,33 @@ export default function NetworkBooster() {
                   </div>
                 )}
 
-                <Button
-                  onClick={applyDnsChange}
-                  className="w-full bg-neon-blue text-dark-bg hover:bg-neon-blue/90 transition-colors"
-                >
-                  <i className="fas fa-rocket mr-2" />
-                  Apply DNS Settings
-                </Button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Interface (optional)</label>
+                  <Input
+                    type="text"
+                    placeholder="e.g., Wi-Fi"
+                    value={interfaceName}
+                    onChange={(e) => setInterfaceName(e.target.value)}
+                    className="bg-dark-bg border-dark-border text-white placeholder-gray-400"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={applyDnsChange}
+                    className="flex-1 bg-neon-blue text-dark-bg hover:bg-neon-blue/90 transition-colors"
+                  >
+                    <i className="fas fa-rocket mr-2" />
+                    Apply DNS Settings
+                  </Button>
+                  <Button
+                    onClick={flushDns}
+                    variant="secondary"
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white"
+                  >
+                    <i className="fas fa-broom mr-2" /> Flush DNS
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -238,76 +276,29 @@ export default function NetworkBooster() {
                     onClick={startPingTest}
                     className="bg-neon-purple text-white hover:bg-neon-purple/90"
                   >
-                    {pingRunning ? (
-                      <>
-                        <i className="fas fa-spinner animate-spin mr-2" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-play mr-2" />
-                        Start Test
-                      </>
-                    )}
+                    <i className="fas fa-play mr-2" /> Start
                   </Button>
                   <Button
                     disabled={!pingRunning}
                     onClick={stopPingTest}
-                    className="bg-red-500 hover:bg-red-600 text-white"
+                    className="bg-red-500 text-white hover:bg-red-600"
                   >
-                    <i className="fas fa-stop mr-2" />
-                    Stop
+                    <i className="fas fa-stop mr-2" /> Stop
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Ping Stats */}
-            {pingResults.length > 0 && (
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-dark-bg rounded-lg p-3 text-center">
-                  <div className="text-neon-green text-2xl font-bold">{pingResults[pingResults.length - 1]}ms</div>
-                  <div className="text-gray-400 text-sm">Current</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {pingResults.map((p, idx) => (
+                <div key={idx} className="bg-dark-bg border border-dark-border rounded p-3 text-center">
+                  <div className="text-white font-medium">{p} ms</div>
+                  <div className="text-gray-500 text-xs">sample {idx + 1}</div>
                 </div>
-                <div className="bg-dark-bg rounded-lg p-3 text-center">
-                  <div className="text-neon-blue text-2xl font-bold">{averagePing}ms</div>
-                  <div className="text-gray-400 text-sm">Average</div>
-                </div>
-                <div className="bg-dark-bg rounded-lg p-3 text-center">
-                  <div className="text-neon-purple text-2xl font-bold">{Math.min(...pingResults)}ms</div>
-                  <div className="text-gray-400 text-sm">Best</div>
-                </div>
-              </div>
-            )}
-
-            {/* Ping Graph */}
-            <div className="bg-dark-bg rounded-lg p-4">
-              <div className="h-32 flex items-end justify-center space-x-1">
-                {pingResults.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <i className="fas fa-chart-line text-2xl mr-2" />
-                    No ping data yet - start a test to see results
-                  </div>
-                ) : (
-                  pingResults.map((ping, i) => (
-                    <div
-                      key={i}
-                      className="bg-gradient-to-t from-neon-green to-neon-blue w-3 rounded-sm transition-all duration-300"
-                      style={{ 
-                        height: `${Math.min((ping / 100) * 100, 100)}%`,
-                        minHeight: '4px'
-                      }}
-                      title={`${ping}ms`}
-                    />
-                  ))
-                )}
-              </div>
-              {pingResults.length > 0 && (
-                <div className="mt-2 text-center text-sm text-gray-400">
-                  Testing {pingTarget} - {pingResults.length}/20 samples
-                </div>
-              )}
+              ))}
             </div>
+
+            <div className="mt-4 text-gray-300">Average Ping: <span className="font-semibold">{averagePing} ms</span></div>
           </div>
 
         </div>

@@ -12,6 +12,11 @@ import FortniteOptimizer from "@/pages/FortniteOptimizer";
 import Settings from "@/pages/Settings";
 import LoginSignup from "@/components/LoginSignup";
 import NotFound from "@/pages/not-found";
+import RestorePoint from "@/pages/RestorePoint";
+import BiosTweaks from "@/pages/BiosTweaks";
+import AudioTweaks from "@/pages/AudioTweaks";
+import RamTweaks from "@/pages/RamTweaks";
+import MiscTweaks from "@/pages/MiscTweaks";
 
 function AuthenticatedRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -41,6 +46,11 @@ function AuthenticatedRouter() {
       <Route path="/gpu" component={GPUTuner} />
       <Route path="/fortnite" component={FortniteOptimizer} />
       <Route path="/settings" component={Settings} />
+      <Route path="/restore" component={RestorePoint} />
+      <Route path="/bios" component={BiosTweaks} />
+      <Route path="/audio" component={AudioTweaks} />
+      <Route path="/ram" component={RamTweaks} />
+      <Route path="/misc" component={MiscTweaks} />
       <Route component={NotFound} />
     </Switch>
   );
