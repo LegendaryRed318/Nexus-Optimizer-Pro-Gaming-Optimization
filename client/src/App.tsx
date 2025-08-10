@@ -7,6 +7,7 @@ import Dashboard from "@/pages/Dashboard";
 import SystemOptimizer from "@/pages/SystemOptimizer";
 import NetworkBooster from "@/pages/NetworkBooster";
 import GPUTuner from "@/pages/GPUTuner";
+import FortniteOptimizer from "@/pages/FortniteOptimizer";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/system" component={SystemOptimizer} />
       <Route path="/network" component={NetworkBooster} />
       <Route path="/gpu" component={GPUTuner} />
+      <Route path="/fortnite" component={FortniteOptimizer} />
       <Route component={NotFound} />
     </Switch>
   );

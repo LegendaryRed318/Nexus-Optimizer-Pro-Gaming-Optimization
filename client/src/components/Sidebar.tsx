@@ -12,13 +12,10 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   { href: "/", icon: "fas fa-tachometer-alt", label: "Dashboard", color: "text-neon-green", isActive: true },
-  { href: "/ai", icon: "fas fa-robot", label: "AI Assistant", color: "text-neon-blue" },
   { href: "/system", icon: "fas fa-cogs", label: "System Optimizer", color: "text-neon-purple" },
   { href: "/network", icon: "fas fa-wifi", label: "Network Booster", color: "text-neon-blue" },
   { href: "/gpu", icon: "fas fa-display", label: "GPU Tuner", color: "text-neon-green" },
-  { href: "/gaming", icon: "fas fa-gamepad", label: "Gaming Profiles", color: "text-neon-purple" },
-  { href: "/overlay", icon: "fas fa-chart-line", label: "FPS Overlay", color: "text-neon-blue" },
-  { href: "/premium", icon: "fas fa-crown", label: "Premium", color: "text-yellow-400" },
+  { href: "/fortnite", icon: "fas fa-gamepad", label: "Fortnite Optimizer", color: "text-blue-400" },
 ];
 
 interface SidebarProps {

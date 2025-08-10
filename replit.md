@@ -4,7 +4,7 @@
 
 Nexus Optimizer Pro is a cross-platform AI-powered gaming optimization application designed to enhance system performance through real-time monitoring, automated tweaks, and intelligent optimization suggestions. The application targets gamers seeking to maximize FPS, reduce latency, and optimize their gaming experience through a sleek, gamer-friendly interface with neon accents and animated components.
 
-The system provides comprehensive system optimization tools including temporary file cleanup, registry tweaks, RAM management, GPU tuning, network optimization, and game-specific optimization profiles. It features an AI-powered chatbot for intelligent optimization suggestions and real-time system monitoring with customizable FPS overlays.
+The system provides comprehensive system optimization tools including temporary file cleanup, registry tweaks, RAM management, GPU tuning, network optimization, and game-specific optimization profiles. It features an AI-powered chatbot for intelligent optimization suggestions, real-time system monitoring with customizable FPS overlays, and dedicated game-specific optimizers (starting with Fortnite).
 
 ## User Preferences
 
