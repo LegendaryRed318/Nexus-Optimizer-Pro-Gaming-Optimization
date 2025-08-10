@@ -1,0 +1,112 @@
+Fortnite uses an .ini config file you can edit to set FrameRateLimit.
+
+Windows path (Epic Games):
+
+shell
+Copy
+Edit
+%localappdata%\FortniteGame\Saved\Config\WindowsClient\GameUserSettings.ini
+Here’s a Python script that edits the FPS cap automatically:
+
+python
+Copy
+Edit
+import os
+import re
+
+# Target FPS options
+FPS_OPTIONS = [180, 144, 120, 100, 60, 30]
+
+# Fortnite config file path
+config_path = os.path.expandvars(
+    r"%localappdata%\FortniteGame\Saved\Config\WindowsClient\GameUserSettings.ini"
+)
+
+def set_fps_limit(fps):
+    if fps not in FPS_OPTIONS:
+        raise ValueError(f"Invalid FPS value. Allowed: {FPS_OPTIONS}")
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config not found: {config_path}")
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Replace or add the FrameRateLimit value
+    if "FrameRateLimit=" in content:
+        content = re.sub(r"FrameRateLimit=\d+(\.\d+)?", f"FrameRateLimit={fps}.000000", content)
+    else:
+        # Add it under [/Script/FortniteGame.FortGameUserSettings]
+        content += f"\nFrameRateLimit={fps}.000000\n"
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    print(f"✅ FPS limit set to {fps} for Fortnite")
+
+# Example usage
+set_fps_limit(144)  # Change to desired FPS
+How to use:
+
+Save as set_fortnite_fps.py.
+
+Run with Python 3.
+
+Restart Fortnite for changes to apply.
+
+2. Universal (System-wide)
+If you want to apply FPS caps across all DirectX games, you can use NVIDIA Profile Inspector (NVIDIA GPUs) or Intel PresentMon + driver settings for Intel GPUs.
+
+For Intel GPUs, you can set a max FPS globally via PresentMon and driver-level controls, but there’s no simple public API — you’d need to use Intel's Control Panel registry keys:
+
+Example (PowerShell script — requires admin):
+
+powershell
+Copy
+Edit
+# FPS options
+$fps = 120  # Change as needed
+
+# Registry path for Intel driver settings
+$regPath = "HKCU\Software\Intel\GFX"
+
+# Create / set FrameRateLimit key
+Set-ItemProperty -Path $regPath -Name "FrameRateLimit" -Value $fps -Type DWord
+
+Write-Host "✅ Global FPS limit set to $fps via Intel registry"
+⚠️ This method may vary depending on your Intel driver version — some store the cap in %AppData% XML profiles instead.
+
+Best integration
+If we put this into your Rust/actix agent from earlier, we can add a new endpoint:
+
+rust
+Copy
+Edit
+#[derive(Deserialize)]
+struct FpsRequest {
+    fps: u32,
+}
+
+#[post("/api/fps/set")]
+async fn set_fps(req: web::Json<FpsRequest>) -> impl Responder {
+    let allowed = [180, 144, 120, 100, 60, 30];
+    if !allowed.contains(&req.fps) {
+        return HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "invalid FPS"}));
+    }
+
+    // TODO: Implement game-specific INI edits (Fortnite) or global registry change
+    // Example: edit Fortnite GameUserSettings.ini here
+
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "fps": req.fps}))
+}
+This way your UI could just do:
+
+javascript
+Copy
+Edit
+fetch("http://127.0.0.1:5050/api/fps/set", {
+  method: "POST",
+  body: JSON.stringify({ fps: 144 }),
+  headers: { "Content-Type": "application/json" }
+});
+…and the agent changes the cap.
+

@@ -72,9 +72,15 @@ Designed for **cloud-based AI service integration** supporting multiple provider
 - **tsx** - TypeScript execution environment for development
 - **esbuild** - High-performance JavaScript bundler for production builds
 
+### Current Integrations
+- **Multi-GPU Support** - NVIDIA and Intel GPU tuning capabilities with vendor-specific optimization panels
+- **Intel GPU Tools** - Graphics Command Center, Power Gadget, and Level Zero integration readiness
+- **Hardware-Accelerated GPU Scheduling (HAGS)** - Windows registry optimization with safe backup/restore
+- **Per-App GPU Preferences** - Windows Graphics Settings integration for game-specific GPU assignment
+
 ### Planned Integrations
-- **GPU Vendor SDKs** (NVAPI, ADLX) for hardware-level optimization control
-- **Cloud AI Services** (OpenAI, Anthropic) for intelligent optimization suggestions
+- **GPU Vendor SDKs** (NVAPI, ADLX, Level Zero) for hardware-level optimization control
+- **Cloud AI Services** (OpenAI, Anthropic) for intelligent optimization suggestions  
 - **System APIs** for Windows/Mac/Linux system optimization capabilities
 - **PostgreSQL** database for production data persistence
 

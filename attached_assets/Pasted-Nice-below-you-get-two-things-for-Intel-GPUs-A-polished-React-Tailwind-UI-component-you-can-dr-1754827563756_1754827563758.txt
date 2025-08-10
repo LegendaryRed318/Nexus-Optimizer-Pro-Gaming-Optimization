@@ -1,0 +1,349 @@
+Nice — below you get two things for Intel GPUs:
+
+A polished React + Tailwind UI component you can drop into your Electron/Tauri app for Intel GPU tuning (controls, live stats, driver & tool links, apply/reset).
+
+A concise, developer-friendly tweaks & commands list that actually works for Intel integrated (Iris/Xe) and discrete Intel Arc hardware — what to call in the native agent, which APIs/tools to use, and safety notes. I also include verified references for the most important items.
+
+1) UI — IntelGpuPanel.jsx (React + Tailwind)
+This UI shows real-time Intel GPU stats, allows safe changes (power profile, driver tools launcher, HAGS toggle, per-app GPU preference helper), and exposes apply/reset actions that call your native agent endpoints.
+
+jsx
+Copy
+Edit
+// IntelGpuPanel.jsx
+import React, { useEffect, useState } from "react";
+
+/**
+ * IntelGpuPanel
+ * - Expects a local agent with endpoints:
+ *   GET  /api/intel/gpu/stats         -> { temperature, usage, clocks, memory, driverVersion }
+ *   POST /api/intel/gpu/apply         -> { action: 'powerProfile'|'hags'|'applyProfile', payload: {...} }
+ *   POST /api/intel/gpu/setAppPref    -> { appPath, preference } // add to Windows Graphics Settings
+ *   POST /api/intel/gpu/reset         -> resets any applied tweaks
+ *
+ * Replace fetch calls with your app's IPC/gRPC methods as needed.
+ */
+
+export default function IntelGpuPanel() {
+  const [stats, setStats] = useState({
+    temperature: "--",
+    usage: "--",
+    eUClock: "--",
+    memoryClock: "--",
+    driverVersion: "--",
+  });
+
+  const [powerProfile, setPowerProfile] = useState("balanced"); // choices: balanced, performance, power-saver
+  const [hagsEnabled, setHagsEnabled] = useState(false);
+  const [appPath, setAppPath] = useState("");
+  const [appPref, setAppPref] = useState("system"); // system | power-saving | high-performance
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    // Poll stats every 2s
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/intel/gpu/stats");
+        if (!res.ok) throw new Error("no stats");
+        const data = await res.json();
+        if (mounted) setStats(data);
+      } catch (e) {
+        if (mounted) setStats((s) => ({ ...s, temperature: "—", usage: "—" }));
+      }
+    };
+    fetchStats();
+    const iv = setInterval(fetchStats, 2000);
+    return () => {
+      mounted = false;
+      clearInterval(iv);
+    };
+  }, []);
+
+  const applyPowerProfile = async () => {
+    setStatus("Applying power profile...");
+    await fetch("/api/intel/gpu/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "powerProfile", payload: { profile: powerProfile } }),
+    });
+    setStatus("Applied power profile.");
+  };
+
+  const toggleHags = async () => {
+    setStatus("Toggling HAGS...");
+    await fetch("/api/intel/gpu/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "hags", payload: { enable: !hagsEnabled } }),
+    });
+    setHagsEnabled((v) => !v);
+    setStatus("HAGS updated (reboot may be required).");
+  };
+
+  const setAppGpuPreference = async () => {
+    if (!appPath) {
+      alert("Please enter the app path (full .exe path).");
+      return;
+    }
+    setStatus("Adding app GPU preference...");
+    await fetch("/api/intel/gpu/setAppPref", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ appPath, preference: appPref }),
+    });
+    setStatus("App GPU preference added.");
+  };
+
+  const applyProfile = async (profileName) => {
+    setStatus("Applying tuning profile...");
+    await fetch("/api/intel/gpu/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "applyProfile", payload: { profileName } }),
+    });
+    setStatus("Profile applied.");
+  };
+
+  const resetAll = async () => {
+    setStatus("Resetting tweaks...");
+    await fetch("/api/intel/gpu/reset", { method: "POST" });
+    setStatus("All tweaks reset.");
+  };
+
+  return (
+    <div className="p-6 bg-white rounded-lg shadow max-w-3xl">
+      <h3 className="text-2xl font-bold mb-4">Intel GPU — Tuning & Tools</h3>
+
+      {/* Live stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="p-3 bg-gray-50 rounded">
+          <div className="text-sm text-gray-500">Temperature</div>
+          <div className="text-lg font-semibold">{stats.temperature} °C</div>
+        </div>
+        <div className="p-3 bg-gray-50 rounded">
+          <div className="text-sm text-gray-500">GPU Usage</div>
+          <div className="text-lg font-semibold">{stats.usage} %</div>
+        </div>
+        <div className="p-3 bg-gray-50 rounded">
+          <div className="text-sm text-gray-500">Driver</div>
+          <div className="text-lg font-semibold">{stats.driverVersion}</div>
+        </div>
+      </div>
+
+      {/* Power profile */}
+      <div className="mb-4 border rounded p-4">
+        <div className="flex justify-between items-center mb-2">
+          <strong>Power Profile</strong>
+          <span className="text-sm text-gray-500">Choose a simple power/thermals preset</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={powerProfile}
+            onChange={(e) => setPowerProfile(e.target.value)}
+            className="border p-2 rounded"
+          >
+            <option value="balanced">Balanced</option>
+            <option value="performance">Performance</option>
+            <option value="power-saver">Power Saver</option>
+          </select>
+          <button onClick={applyPowerProfile} className="px-3 py-2 bg-indigo-600 text-white rounded">
+            Apply
+          </button>
+
+          <button onClick={() => applyProfile("fortnite_opt")} className="px-3 py-2 bg-green-600 text-white rounded">
+            Apply Fortnite Profile
+          </button>
+        </div>
+      </div>
+
+      {/* HAGS toggle */}
+      <div className="mb-4 border rounded p-4">
+        <div className="flex justify-between items-center mb-2">
+          <strong>Hardware-accelerated GPU Scheduling (HAGS)</strong>
+          <span className="text-sm text-gray-500">May reduce latency on supported systems</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center space-x-2">
+            <input type="checkbox" checked={hagsEnabled} onChange={toggleHags} />
+            <span>{hagsEnabled ? "Enabled" : "Disabled"}</span>
+          </label>
+          <button
+            onClick={() => setStatus("Open Settings...")}
+            className="px-3 py-2 bg-gray-200 rounded"
+          >
+            Open Windows Graphics Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Per-app GPU preference */}
+      <div className="mb-4 border rounded p-4">
+        <strong>Per-app GPU Preference (Windows)</strong>
+        <p className="text-sm text-gray-500 mb-2">Add a .exe and choose its GPU preference (high-performance -> prefer dGPU if present).</p>
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            placeholder="C:\\Games\\Fortnite\\FortniteClient-Win64-Shipping.exe"
+            value={appPath}
+            onChange={(e) => setAppPath(e.target.value)}
+            className="flex-1 border p-2 rounded"
+          />
+          <select value={appPref} onChange={(e) => setAppPref(e.target.value)} className="border p-2 rounded">
+            <option value="system">System default</option>
+            <option value="power-saving">Power-saving GPU</option>
+            <option value="high-performance">High-performance GPU</option>
+          </select>
+          <button onClick={setAppGpuPreference} className="px-3 py-2 bg-indigo-600 text-white rounded">Add</button>
+        </div>
+      </div>
+
+      {/* Tools */}
+      <div className="mb-4 border rounded p-4">
+        <strong>Intel Tools</strong>
+        <p className="text-sm text-gray-500 mb-2">Launch Intel tools for driver & power monitoring.</p>
+        <div className="flex gap-2">
+          <button onClick={() => window.open("ms-windows-store://pdp/?productid=9P3F1MZ8N2MB")} className="px-3 py-2 bg-blue-600 text-white rounded">Open Intel Graphics Command Center</button>
+          <button onClick={() => fetch("/api/intel/launch", {method:"POST", body: JSON.stringify({tool: 'powerGadget'})})} className="px-3 py-2 bg-gray-600 text-white rounded">Launch Intel Power Gadget</button>
+          <button onClick={() => fetch("/api/intel/launch", {method:"POST", body: JSON.stringify({tool: 'vtune'})})} className="px-3 py-2 bg-gray-600 text-white rounded">Open VTune / Level Zero Tools</button>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-600">{status}</div>
+        <div>
+          <button onClick={resetAll} className="px-3 py-2 bg-red-600 text-white rounded">Reset All</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+2) Tweaks & Developer Notes — what to implement in the native agent
+Below are practical tweaks you should implement and expose to the UI via your local agent. Each tweak includes the recommended method (API/command/tool) and a short rationale.
+
+A — Keep drivers & Intel tools updated
+Use Intel Graphics Command Center (IGCC) or latest Intel Graphics Software to manage settings and driver updates. IGCC exposes in-app settings and is the official recommended tool. 
+Intel
++1
+
+Agent action: open Microsoft Store link for IGCC or run the Intel installer; provide "Check for driver updates" action.
+
+B — Monitor power & temps with Intel Power Gadget
+Intel Power Gadget provides CPU power and temperature telemetry; useful for correlating CPU/GPU thermal throttling on Intel platforms. Use its API for high-resolution power metrics. 
+Intel
+TechSpot
+
+Agent action: launch Power Gadget process and read its API (or spawn and parse output).
+
+C — Use Level Zero / VTune APIs for advanced GPU metrics
+For accurate GPU occupancy, memory bandwidth, and performance counters on Intel GPUs (Arc, Iris), use Level Zero (oneAPI Level Zero) or VTune APIs. This gives you frame-accurate metrics for tuning and overlay display. 
+Intel
++1
+
+Agent action: integrate Level Zero metrics collection into the native module and expose via /api/intel/gpu/stats.
+
+D — Hardware-accelerated GPU scheduling (HAGS)
+Windows exposes HwSchMode registry value under HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers. Values: 2 = enable, 1 = disable (reboot required). Enabling HAGS can reduce latency on supported hardware but should be A/B tested per device. 
+How-To Geek
+Infinitive Host
+
+Safe command (native agent runs as admin):
+
+powershell
+Copy
+Edit
+# Enable HAGS
+reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers" /v HwSchMode /t REG_DWORD /d 2 /f
+# Disable HAGS
+reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers" /v HwSchMode /t REG_DWORD /d 1 /f
+# Reboot required
+Agent action: present a confirmation dialog, backup registry, run command, and notify user to reboot.
+
+E — Per-app GPU preference (Windows Graphics Settings)
+Windows 10/11 let users set per-app GPU preference (System → Display → Graphics settings). These preferences are stored in the registry and can be scripted/backed up. Use the registry export/import to implement batch adds or restoration. 
+Ten Forums
+
+Agent action: call a native routine that adds the app to Windows Graphics settings (or modifies the registry key) and backs up that key for rollback.
+
+F — Power plans and Windows settings that help Intel GPUs
+Change power plan to High performance or a custom balanced profile when gaming.
+
+Turn off unnecessary background features (memory integrity, virtualization features) if they affect performance (advise users). Recent Windows guides list practical performance tweaks. 
+Windows Central
+
+Agent actions & example cmd:
+
+powershell
+Copy
+Edit
+# Set high performance (Windows)
+powercfg /setactive SCHEME_MIN
+# Or set custom plan GUIDs as needed.
+G — Scaling & display settings
+For integrated GPUs, lowering internal render resolution or enabling vertical sync cap / frame limiters in-game often gives the best real-world gains.
+
+Use IGCC to set scaling options or expose "GPU scaling" via command if Intel API allows.
+
+Agent action: apply per-game presets (e.g., lower render scale for Fortnite) and optionally set Windows Game Mode on.
+
+H — Thermal management & throttling avoidance
+Detect sustained high temps via Power Gadget or LibreHardwareMonitor and:
+
+apply fan curve (if system/BIOS supports it),
+
+lower clock targets or switch to a power-saver profile temporarily,
+
+notify users to improve cooling (dock, vents, fans).
+
+Agent action: implement automatic "thermal throttle protector" profile to reduce clocks when temp > threshold.
+
+I — Safety & Rollback (must-have)
+Always create a restore point (Windows System Restore or registry export) before applying registry/tuning changes.
+
+Log all changes with timestamps and provide “Revert last change” and “Reset all” endpoints in the agent.
+
+Quick Implementation checklist for your native agent (short)
+Integrate Level Zero / VTune for GPU metrics. 
+Intel
++1
+
+Use Intel Power Gadget API for CPU power/temps. 
+Intel
+
+Launch or link to Intel Graphics Command Center for driver updates and video settings. 
+Intel
++1
+
+Implement HwSchMode registry toggle with backup & reboot flow for HAGS. 
+How-To Geek
+
+Provide per-app GPU preference management (registry backup/restore). 
+Ten Forums
+
+Safety & user-facing messaging (copy for UI)
+“Before applying low-level changes we’ll create a backup and a System Restore point.”
+
+“Some tweaks (HAGS, driver changes) require a reboot — you’ll be prompted.”
+
+“Overlay and hooks may be disallowed by some anti-cheat systems — disable overlay for those games.”
+
+Sources (most important references)
+Intel Graphics Command Center user guidance / docs. 
+Intel
++1
+
+Intel Power Gadget (monitoring and API). 
+Intel
+TechSpot
+
+Level Zero / oneAPI Level Zero for low-level GPU metrics. 
+Intel
+oneAPI
+
+Windows per-app GPU preferences & registry storage (how to back up/restore). 
+Ten Forums
+
+How to enable Hardware-accelerated GPU Scheduling (HwSchMode registry key). 
+How-To Geek
+Infinitive Host
+

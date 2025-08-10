@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import IntelGpuPanel from "@/components/IntelGpuPanel";
 
 export default function GPUTuner() {
   const [gpuStats, setGpuStats] = useState({
@@ -133,7 +135,26 @@ export default function GPUTuner() {
             <p className="text-gray-400 mt-2">Fine-tune your graphics card for maximum gaming performance</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Tabs defaultValue="nvidia" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-dark-card border border-dark-border">
+              <TabsTrigger 
+                value="nvidia" 
+                className="data-[state=active]:bg-neon-green data-[state=active]:text-dark-bg"
+              >
+                <i className="fab fa-nvidia mr-2" />
+                NVIDIA GPU
+              </TabsTrigger>
+              <TabsTrigger 
+                value="intel" 
+                className="data-[state=active]:bg-neon-blue data-[state=active]:text-white"
+              >
+                <i className="fab fa-intel mr-2" />
+                Intel GPU
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="nvidia" className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* GPU Statistics */}
             <div className="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
@@ -399,7 +420,13 @@ export default function GPUTuner() {
                 <span>Performance</span>
               </Button>
             </div>
-          </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="intel" className="space-y-8">
+              <IntelGpuPanel />
+            </TabsContent>
+          </Tabs>
 
         </div>
       </div>

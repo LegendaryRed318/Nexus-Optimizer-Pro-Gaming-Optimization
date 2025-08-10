@@ -1,0 +1,233 @@
+A compact developer brief / Upwork job post you can copy/paste to hire devs or feed into an AI builder.
+
+A ready-to-use native agent skeleton (Rust + actix-web) that implements the exact HTTP endpoints your UI expects (/api/intel/gpu/stats, /api/intel/gpu/apply, /api/intel/gpu/setAppPref, /api/intel/gpu/reset) — it returns mock data so the UI works immediately and is easy for engineers to extend with real vendor APIs (Level Zero, Power Gadget, registry edits, etc.).
+
+You can hand both to a freelancer or paste into Replit Agent v2 to get a working prototype quickly.
+
+1) Developer brief / Job post (copy/paste)
+Title: Native Systems Engineer — Intel GPU & Local Agent (C++/Rust) for Nexus Optimizer Pro
+
+Overview:
+We’re building Nexus Optimizer Pro, a cross-platform game optimization app (Electron/Tauri UI). We need a native background agent (Windows-first, later macOS/Linux) to expose secure local HTTP APIs for GPU telemetry, Intel-specific tuning, and safe system tweaks. The UI is already built and integrated — your agent must implement the server API and the actual OS/vendor calls.
+
+Scope & Deliverables (initial MVP):
+
+Local agent (Rust or C++) that runs as a user service and exposes these endpoints:
+
+GET /api/intel/gpu/stats — returns current GPU temp, usage, clocks, driver.
+
+POST /api/intel/gpu/apply — actions: powerProfile, hags, applyProfile.
+
+POST /api/intel/gpu/setAppPref — add app GPU preference (Windows Graphics Settings).
+
+POST /api/intel/gpu/reset — restore saved defaults.
+
+Implement HAGS toggle via registry (with safe backup and clear UI-friendly errors).
+
+Integrate Intel Power Gadget or Level Zero for telemetry (or stub if unavailable).
+
+Implement robust backup/restore for any registry edits or config changes.
+
+Provide unit tests for endpoints and local integration tests that verify registry backup/restore.
+
+Deliver: source code, build scripts, signed debug build instructions, README (how to test), and mini-demo video.
+
+Acceptance Criteria / Tests:
+
+GET /api/intel/gpu/stats returns JSON { temperature, usage, eUClock, memoryClock, driverVersion } with realistic values (stub acceptable for CI).
+
+POST /api/intel/gpu/apply with {action:"hags", payload:{enable:true}} must create a registry backup, write HwSchMode=2, and return success JSON; a revert command must restore previous value.
+
+Unit tests to simulate registry failure and ensure the agent rolls back.
+
+Provide sample code showing how UI can call the endpoints and handle errors.
+
+Tech / Skills Required:
+
+Systems programming: Rust or C++ (preferred Rust with actix/tokio experience).
+
+Windows internals: registry, WMI familiarity.
+
+Experience with Intel Level Zero / Power Gadget / driver telemetry is a plus.
+
+Experience exposing a secure local HTTP or gRPC API.
+
+Familiarity with code signing & Windows Service creation a plus.
+
+Budget & Timeline:
+MVP in 2–3 weeks, budget negotiable — include estimate and prior work samples (especially NVAPI/Level Zero or system agent work).
+
+How to apply: Provide GitHub links to relevant repos and a short plan for implementing HAGS toggle and GPU telemetry.
+
+2) Native agent skeleton — Rust (actix-web) — mock-ready
+This is a minimal Rust server that exposes the endpoints your UI expects. It returns mock telemetry and simulates actions (so your UI works immediately). Engineers can replace the mocks with real vendor SDK calls (Level Zero, Power Gadget, registry edits).
+
+Note: this is a skeleton — production code should add authentication (e.g., local token), proper error handling, elevated-action flows (UAC), backups, logging, tests, and code signing.
+
+rust
+Copy
+Edit
+// Cargo.toml (important deps)
+// [package] ...
+// [dependencies]
+// actix-web = "4"
+// serde = { version = "1.0", features = ["derive"] }
+// serde_json = "1.0"
+// tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+// anyhow = "1.0"
+// once_cell = "1.17"
+
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+use anyhow::Result;
+
+static STATE: Lazy<Mutex<AppState>> = Lazy::new(|| Mutex::new(AppState::default()));
+
+#[derive(Default)]
+struct AppState {
+    // store applied profiles, backups etc in-memory for demo
+    last_profile: Option<String>,
+    hags_enabled: bool,
+}
+
+#[derive(Serialize)]
+struct GpuStats {
+    temperature: f32,
+    usage: u8,
+    e_u_clock: u32,
+    memory_clock: u32,
+    driver_version: String,
+}
+
+#[get("/api/intel/gpu/stats")]
+async fn get_gpu_stats() -> impl Responder {
+    // Mocked data — replace with Level Zero / PowerGadget integration
+    let stats = GpuStats {
+        temperature: 61.3,
+        usage: 42,
+        e_u_clock: 1200,
+        memory_clock: 3800,
+        driver_version: "30.0.101.134".to_string(),
+    };
+    HttpResponse::Ok().json(stats)
+}
+
+#[derive(Deserialize)]
+struct ApplyRequest {
+    action: String,
+    payload: Option<serde_json::Value>,
+}
+
+#[post("/api/intel/gpu/apply")]
+async fn post_apply(req: web::Json<ApplyRequest>) -> impl Responder {
+    let mut s = STATE.lock().unwrap();
+    match req.action.as_str() {
+        "powerProfile" => {
+            if let Some(payload) = &req.payload {
+                if let Some(profile) = payload.get("profile").and_then(|p| p.as_str()) {
+                    s.last_profile = Some(profile.to_string());
+                    // TODO: integrate with native power profile APIs
+                    return HttpResponse::Ok().json(serde_json::json!({"ok": true, "msg": format!("Applied profile {}", profile)}));
+                }
+            }
+            HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "missing profile"}))
+        }
+        "hags" => {
+            // payload: { enable: true }
+            if let Some(payload) = &req.payload {
+                if let Some(enable) = payload.get("enable").and_then(|v| v.as_bool()) {
+                    // TODO: backup registry -> set HwSchMode value
+                    s.hags_enabled = enable;
+                    // NOTE: actual implementation requires admin rights and backup.
+                    return HttpResponse::Ok().json(serde_json::json!({"ok": true, "hags_enabled": enable}));
+                }
+            }
+            HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "missing payload"}))
+        }
+        "applyProfile" => {
+            if let Some(payload) = &req.payload {
+                if let Some(profile) = payload.get("profileName").and_then(|p| p.as_str()) {
+                    s.last_profile = Some(profile.to_string());
+                    return HttpResponse::Ok().json(serde_json::json!({"ok": true, "msg": format!("Profile {} applied", profile)}));
+                }
+            }
+            HttpResponse::BadRequest().json(serde_json::json!({"ok": false}))
+        }
+        _ => HttpResponse::BadRequest().json(serde_json::json!({"ok": false, "msg": "unknown action"})),
+    }
+}
+
+#[derive(Deserialize)]
+struct SetAppPref {
+    appPath: String,
+    preference: String,
+}
+
+#[post("/api/intel/gpu/setAppPref")]
+async fn set_app_pref(req: web::Json<SetAppPref>) -> impl Responder {
+    // TODO: implement Windows Graphics Settings registry add with backup
+    println!("Set app pref: {} -> {}", req.appPath, req.preference);
+    HttpResponse::Ok().json(serde_json::json!({"ok": true}))
+}
+
+#[post("/api/intel/gpu/reset")]
+async fn reset_all() -> impl Responder {
+    let mut s = STATE.lock().unwrap();
+    s.last_profile = None;
+    s.hags_enabled = false;
+    // TODO: restore backups and revert registry / config edits
+    HttpResponse::Ok().json(serde_json::json!({"ok": true, "msg":"reset done"}))
+}
+
+#[actix_web::main]
+async fn main() -> Result<()> {
+    let addr = "127.0.0.1:5050";
+    println!("Starting local agent at http://{}", addr);
+    HttpServer::new(|| {
+        App::new()
+            .service(get_gpu_stats)
+            .service(post_apply)
+            .service(set_app_pref)
+            .service(reset_all)
+    })
+    .bind(addr)?
+    .run()
+    .await?;
+    Ok(())
+}
+How to run (dev):
+
+Install Rust toolchain.
+
+cargo new nexus-agent && cd nexus-agent
+
+Add dependencies to Cargo.toml (actix-web, serde, tokio, once_cell).
+
+Paste the code into src/main.rs.
+
+cargo run — opens server on http://127.0.0.1:5050.
+
+Next steps for engineers to productionize:
+
+Replace mocked get_gpu_stats with Level Zero / Intel Power Gadget or Win32/ETW collectors.
+
+Implement HAGS registry backup + apply + restore using winreg crate (Windows) with admin-elevation flow.
+
+Add authentication for local calls (e.g., signed JWT with key stored in user folder).
+
+Add logging, structured errors, metrics, and unit tests.
+
+Package as a Windows service (or systemd unit for Linux) and provide installer.
+
+Quick checklist to hand the skeleton to a developer
+Add Level Zero / Power Gadget integration to get_gpu_stats.
+
+Implement post_apply actions as atomic operations: backup → apply → verify → respond. Store backups in a timestamped folder for restore.
+
+Implement set_app_pref using Windows Graphics Settings registry keys (and export import for rollback).
+
+Add an elevated helper binary to perform registry edits and actions requiring admin (UI calls agent to request elevation on demand).
+
+Add tests that validate GET /api/intel/gpu/stats matches HWInfo/PowerGadget within acceptable error margins.
