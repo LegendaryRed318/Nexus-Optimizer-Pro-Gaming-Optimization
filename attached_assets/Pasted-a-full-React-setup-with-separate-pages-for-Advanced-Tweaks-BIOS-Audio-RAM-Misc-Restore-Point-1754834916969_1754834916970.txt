@@ -1,0 +1,389 @@
+a full React setup with separate pages for:
+
+Advanced Tweaks (BIOS, Audio, RAM, Misc)
+
+Restore Points (manage/restore backups of your optimization settings)
+
+I'll provide a simple page navigation example too, so you can switch between them easily.
+
+1. Main App with Navigation
+jsx
+Copy
+Edit
+import React, { useState } from "react";
+import AdvancedTweaks from "./AdvancedTweaksPage";
+import RestorePoints from "./RestorePointsPage";
+
+export default function App() {
+  const [currentPage, setCurrentPage] = useState("advanced");
+
+  return (
+    <div>
+      <nav style={styles.nav}>
+        <button
+          onClick={() => setCurrentPage("advanced")}
+          style={currentPage === "advanced" ? styles.activeBtn : styles.btn}
+        >
+          Advanced Tweaks
+        </button>
+        <button
+          onClick={() => setCurrentPage("restore")}
+          style={currentPage === "restore" ? styles.activeBtn : styles.btn}
+        >
+          Restore Points
+        </button>
+      </nav>
+
+      <main style={{ padding: 20 }}>
+        {currentPage === "advanced" && <AdvancedTweaks />}
+        {currentPage === "restore" && <RestorePoints />}
+      </main>
+    </div>
+  );
+}
+
+const styles = {
+  nav: {
+    display: "flex",
+    justifyContent: "center",
+    gap: 10,
+    margin: 20,
+  },
+  btn: {
+    padding: "10px 20px",
+    cursor: "pointer",
+    backgroundColor: "#444",
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+  },
+  activeBtn: {
+    padding: "10px 20px",
+    cursor: "pointer",
+    backgroundColor: "#0088ff",
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+  },
+};
+2. Advanced Tweaks Page (AdvancedTweaksPage.js)
+(Same as previous AdvancedTweaks component, but as a standalone page)
+
+jsx
+Copy
+Edit
+import React, { useState, useEffect } from "react";
+
+export default function AdvancedTweaks() {
+  // BIOS Tweaks
+  const [fastBoot, setFastBoot] = useState(false);
+  const [secureBoot, setSecureBoot] = useState(true);
+  const [cpuCStates, setCpuCStates] = useState(true);
+
+  // Audio Tweaks
+  const [enableEnhancements, setEnableEnhancements] = useState(false);
+  const [bassBoost, setBassBoost] = useState(false);
+  const [surroundSound, setSurroundSound] = useState(false);
+
+  // RAM Tweaks
+  const [prefetchEnabled, setPrefetchEnabled] = useState(true);
+  const [superfetchEnabled, setSuperfetchEnabled] = useState(true);
+  const [virtualMemorySize, setVirtualMemorySize] = useState(4096); // MB
+
+  // Miscellaneous tweaks
+  const [disableAnimations, setDisableAnimations] = useState(false);
+  const [disableTransparency, setDisableTransparency] = useState(false);
+  const [highPerformancePowerPlan, setHighPerformancePowerPlan] = useState(false);
+
+  useEffect(() => {
+    // Save or sync the settings here (e.g. API call or native agent)
+    const settings = {
+      bios: { fastBoot, secureBoot, cpuCStates },
+      audio: { enableEnhancements, bassBoost, surroundSound },
+      ram: { prefetchEnabled, superfetchEnabled, virtualMemorySize },
+      misc: { disableAnimations, disableTransparency, highPerformancePowerPlan },
+    };
+    console.log("Saving tweaks:", settings);
+  }, [
+    fastBoot,
+    secureBoot,
+    cpuCStates,
+    enableEnhancements,
+    bassBoost,
+    surroundSound,
+    prefetchEnabled,
+    superfetchEnabled,
+    virtualMemorySize,
+    disableAnimations,
+    disableTransparency,
+    highPerformancePowerPlan,
+  ]);
+
+  return (
+    <div style={styles.container}>
+      <h2>Advanced System Tweaks</h2>
+
+      <Section title="BIOS Tweaks">
+        <Toggle label="Enable Fast Boot" checked={fastBoot} onChange={setFastBoot} />
+        <Toggle label="Enable Secure Boot" checked={secureBoot} onChange={setSecureBoot} />
+        <Toggle label="Enable CPU C-States" checked={cpuCStates} onChange={setCpuCStates} />
+      </Section>
+
+      <Section title="Audio Tweaks">
+        <Toggle label="Enable Audio Enhancements" checked={enableEnhancements} onChange={setEnableEnhancements} />
+        <Toggle label="Bass Boost" checked={bassBoost} onChange={setBassBoost} />
+        <Toggle label="Surround Sound" checked={surroundSound} onChange={setSurroundSound} />
+      </Section>
+
+      <Section title="RAM Tweaks">
+        <Toggle label="Enable Prefetch" checked={prefetchEnabled} onChange={setPrefetchEnabled} />
+        <Toggle label="Enable Superfetch" checked={superfetchEnabled} onChange={setSuperfetchEnabled} />
+        <Slider
+          label="Virtual Memory Size (MB)"
+          min={1024}
+          max={16384}
+          step={512}
+          value={virtualMemorySize}
+          onChange={setVirtualMemorySize}
+        />
+      </Section>
+
+      <Section title="Miscellaneous Modifications">
+        <Toggle label="Disable UI Animations" checked={disableAnimations} onChange={setDisableAnimations} />
+        <Toggle label="Disable Transparency Effects" checked={disableTransparency} onChange={setDisableTransparency} />
+        <Toggle label="Use High Performance Power Plan" checked={highPerformancePowerPlan} onChange={setHighPerformancePowerPlan} />
+      </Section>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>{title}</h3>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function Toggle({ label, checked, onChange }) {
+  return (
+    <label style={styles.toggleLabel}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        style={styles.checkbox}
+      />
+      {label}
+    </label>
+  );
+}
+
+function Slider({ label, min, max, step, value, onChange }) {
+  return (
+    <div style={styles.sliderContainer}>
+      <label>{label}: <strong>{value} MB</strong></label>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={styles.slider}
+      />
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    maxWidth: 600,
+    margin: "auto",
+    padding: 20,
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    backgroundColor: "#1f1f1f",
+    color: "#eee",
+    borderRadius: 12,
+    boxShadow: "0 6px 16px rgba(0,0,0,0.4)",
+  },
+  section: {
+    marginBottom: 30,
+    paddingBottom: 15,
+    borderBottom: "1px solid #444",
+  },
+  sectionTitle: {
+    marginBottom: 15,
+    fontWeight: "bold",
+    fontSize: 20,
+  },
+  toggleLabel: {
+    display: "block",
+    marginBottom: 12,
+    fontSize: 16,
+    cursor: "pointer",
+  },
+  checkbox: {
+    marginRight: 10,
+    width: 18,
+    height: 18,
+    cursor: "pointer",
+  },
+  sliderContainer: {
+    marginBottom: 20,
+  },
+  slider: {
+    width: "100%",
+    marginTop: 8,
+  },
+};
+3. Restore Points Page (RestorePointsPage.js)
+This page lets users see saved restore points, and restore settings from them. This example uses localStorage for simplicity — replace with your backend or native agent.
+
+jsx
+Copy
+Edit
+import React, { useState, useEffect } from "react";
+
+export default function RestorePoints() {
+  const [restorePoints, setRestorePoints] = useState([]);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    loadRestorePoints();
+  }, []);
+
+  function loadRestorePoints() {
+    const pointsJson = localStorage.getItem("restorePoints");
+    if (pointsJson) {
+      setRestorePoints(JSON.parse(pointsJson));
+    }
+  }
+
+  function createRestorePoint() {
+    const currentSettings = localStorage.getItem("settings") || "{}";
+    const newPoint = {
+      id: Date.now(),
+      timestamp: new Date().toLocaleString(),
+      settings: JSON.parse(currentSettings),
+    };
+
+    const updated = [newPoint, ...restorePoints].slice(0, 10); // keep max 10
+    localStorage.setItem("restorePoints", JSON.stringify(updated));
+    setRestorePoints(updated);
+    setMessage("Restore point created!");
+  }
+
+  function restore(point) {
+    localStorage.setItem("settings", JSON.stringify(point.settings));
+    setMessage(`Settings restored from ${point.timestamp}`);
+    // You would also want to sync with your backend or native agent here
+  }
+
+  function deletePoint(id) {
+    const updated = restorePoints.filter((p) => p.id !== id);
+    localStorage.setItem("restorePoints", JSON.stringify(updated));
+    setRestorePoints(updated);
+  }
+
+  return (
+    <div style={styles.container}>
+      <h2>Restore Points</h2>
+
+      <button onClick={createRestorePoint} style={styles.createBtn}>
+        Create Restore Point
+      </button>
+
+      {message && <p style={{ color: "lightgreen" }}>{message}</p>}
+
+      {restorePoints.length === 0 && <p>No restore points found.</p>}
+
+      <ul style={styles.list}>
+        {restorePoints.map((point) => (
+          <li key={point.id} style={styles.listItem}>
+            <span>{point.timestamp}</span>
+            <div>
+              <button style={styles.restoreBtn} onClick={() => restore(point)}>Restore</button>
+              <button style={styles.deleteBtn} onClick={() => deletePoint(point.id)}>Delete</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    maxWidth: 600,
+    margin: "auto",
+    padding: 20,
+    backgroundColor: "#222",
+    color: "#eee",
+    borderRadius: 12,
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    boxShadow: "0 6px 12px rgba(0,0,0,0.5)",
+  },
+  createBtn: {
+    padding: "10px 20px",
+    backgroundColor: "#00aaff",
+    border: "none",
+    borderRadius: 8,
+    color: "#fff",
+    cursor: "pointer",
+    marginBottom: 20,
+  },
+  list: {
+    listStyle: "none",
+    padding: 0,
+  },
+  listItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "10px 15px",
+    backgroundColor: "#333",
+    borderRadius: 8,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  restoreBtn: {
+    marginRight: 10,
+    padding: "6px 14px",
+    backgroundColor: "#44cc44",
+    border: "none",
+    borderRadius: 6,
+    color: "#fff",
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    padding: "6px 14px",
+    backgroundColor: "#cc4444",
+    border: "none",
+    borderRadius: 6,
+    color: "#fff",
+    cursor: "pointer",
+  },
+};
+How to Integrate
+Put all files in your React project.
+
+App.js controls navigation.
+
+AdvancedTweaksPage.js has your tweak toggles/sliders.
+
+RestorePointsPage.js manages save/load/restore for settings.
+
+Make sure tweaks update localStorage.settings (or backend) and the restore points page reads/writes to the same.
+
+Next Steps for Real Integration
+Connect your backend or native system agent to apply settings on toggle change.
+
+Create backup snapshots on native level (registry, config files, etc).
+
+Allow restore points to rollback system state safely.
+
+Add confirmation dialogs before restoring or deleting.
+
+Implement cloud sync if users log in.
+

@@ -2,24 +2,173 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertChatMessageSchema } from "@shared/schema";
+import { 
+  insertChatMessageSchema, 
+  insertUserSchema, 
+  loginUserSchema,
+  updateUserSettingsSchema 
+} from "@shared/schema";
+import { 
+  generateToken, 
+  hashPassword, 
+  comparePassword, 
+  authenticateToken, 
+  optionalAuth,
+  getUserId,
+  getOptionalUserId,
+  type AuthenticatedRequest 
+} from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // API Routes
-  app.get("/api/system-stats", async (req, res) => {
+  // Authentication Routes
+  app.post("/api/auth/signup", async (req, res) => {
     try {
-      const stats = await storage.getLatestSystemStats();
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(userData.username);
+      if (existingUser) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Username already taken" 
+        });
+      }
+
+      // Hash password and create user
+      const hashedPassword = await hashPassword(userData.password);
+      const user = await storage.createUser({
+        ...userData,
+        passwordHash: hashedPassword,
+      });
+
+      // Generate token
+      const token = generateToken(user);
+      
+      res.json({ 
+        success: true, 
+        message: "Account created successfully",
+        token,
+        user: { id: user.id, username: user.username, email: user.email }
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(400).json({ 
+        success: false, 
+        message: "Invalid signup data" 
+      });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const loginData = loginUserSchema.parse(req.body);
+      
+      // Find user by username
+      const user = await storage.getUserByUsername(loginData.username);
+      if (!user) {
+        return res.status(401).json({ 
+          success: false, 
+          message: "Invalid credentials" 
+        });
+      }
+
+      // Check password
+      const isValidPassword = await comparePassword(loginData.password, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ 
+          success: false, 
+          message: "Invalid credentials" 
+        });
+      }
+
+      // Update last login
+      await storage.updateUserLastLogin(user.id);
+
+      // Generate token
+      const token = generateToken(user);
+      
+      res.json({ 
+        success: true, 
+        message: "Login successful",
+        token,
+        user: { id: user.id, username: user.username, email: user.email }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(400).json({ 
+        success: false, 
+        message: "Invalid login data" 
+      });
+    }
+  });
+
+  app.get("/api/auth/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "User not found" 
+        });
+      }
+
+      res.json({ 
+        success: true,
+        user: { id: user.id, username: user.username, email: user.email }
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to get user info" 
+      });
+    }
+  });
+
+  // User Settings Routes
+  app.get("/api/settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      const settings = await storage.getUserSettings(userId);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get user settings" });
+    }
+  });
+
+  app.put("/api/settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      const updates = updateUserSettingsSchema.parse(req.body);
+      
+      const updatedSettings = await storage.updateUserSettings(userId, updates);
+      if (!updatedSettings) {
+        return res.status(404).json({ error: "Settings not found" });
+      }
+      
+      res.json(updatedSettings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  // API Routes
+  app.get("/api/system-stats", optionalAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getOptionalUserId(req);
+      const stats = await storage.getLatestSystemStats(userId);
       res.json(stats || null);
     } catch (error) {
       res.status(500).json({ error: "Failed to get system stats" });
     }
   });
 
-  app.get("/api/game-profiles", async (req, res) => {
+  app.get("/api/game-profiles", optionalAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const profiles = await storage.getGameProfiles();
+      const userId = getOptionalUserId(req);
+      const profiles = await storage.getGameProfiles(userId);
       res.json(profiles);
     } catch (error) {
       res.status(500).json({ error: "Failed to get game profiles" });

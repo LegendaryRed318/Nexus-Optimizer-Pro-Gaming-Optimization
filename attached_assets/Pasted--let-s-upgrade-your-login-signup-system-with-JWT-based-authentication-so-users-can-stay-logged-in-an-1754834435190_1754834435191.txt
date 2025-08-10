@@ -1,0 +1,214 @@
+ let’s upgrade your login/signup system with JWT-based authentication so users can stay logged in and you can sync their settings across devices.
+This will make it production-ready and secure.
+
+Backend (Node.js + Express + JWT + SQLite)
+File: server.js
+
+javascript
+Copy
+Edit
+const express = require("express");
+const bodyParser = require("body-parser");
+const sqlite3 = require("sqlite3").verbose();
+const bcrypt = require("bcrypt");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+
+const app = express();
+const db = new sqlite3.Database("./users.db");
+const SECRET_KEY = "your-super-secret-key"; // Change in production
+
+app.use(cors());
+app.use(bodyParser.json());
+
+// Create table if not exists
+db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT
+)`);
+
+// Generate JWT Token
+function generateToken(user) {
+    return jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: "7d" });
+}
+
+// Middleware: Verify token
+function authenticateToken(req, res, next) {
+    const token = req.headers["authorization"]?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Token required" });
+
+    jwt.verify(token, SECRET_KEY, (err, user) => {
+        if (err) return res.status(403).json({ message: "Invalid token" });
+        req.user = user;
+        next();
+    });
+}
+
+// Signup
+app.post("/signup", async (req, res) => {
+    const { username, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    db.run(`INSERT INTO users (username, password) VALUES (?, ?)`,
+        [username, hashedPassword],
+        function (err) {
+            if (err) {
+                return res.status(400).json({ message: "Username already taken" });
+            }
+            const token = generateToken({ id: this.lastID, username });
+            res.json({ message: "Signup successful", token });
+        }
+    );
+});
+
+// Login
+app.post("/login", (req, res) => {
+    const { username, password } = req.body;
+
+    db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, row) => {
+        if (err) return res.status(500).json({ message: "Database error" });
+        if (!row) return res.status(401).json({ message: "Invalid credentials" });
+
+        const match = await bcrypt.compare(password, row.password);
+        if (!match) return res.status(401).json({ message: "Invalid credentials" });
+
+        const token = generateToken(row);
+        res.json({ message: "Login successful", token });
+    });
+});
+
+// Example protected route
+app.get("/me", authenticateToken, (req, res) => {
+    res.json({ user: req.user });
+});
+
+app.listen(5000, () => console.log("Auth server running on port 5000"));
+Frontend (React UI)
+File: LoginSignup.js
+
+javascript
+Copy
+Edit
+import React, { useState } from "react";
+import axios from "axios";
+
+export default function LoginSignup({ onLogin }) {
+    const [mode, setMode] = useState("login"); 
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [message, setMessage] = useState("");
+
+    const handleSubmit = async () => {
+        try {
+            const endpoint = mode === "login" ? "/login" : "/signup";
+            const res = await axios.post(`http://localhost:5000${endpoint}`, {
+                username,
+                password
+            });
+            localStorage.setItem("token", res.data.token); // Save JWT
+            setMessage(res.data.message);
+            onLogin && onLogin(); // Tell app user is logged in
+        } catch (err) {
+            setMessage(err.response?.data?.message || "Error occurred");
+        }
+    };
+
+    return (
+        <div style={styles.container}>
+            <h2>{mode === "login" ? "Login" : "Sign Up"}</h2>
+            <input
+                style={styles.input}
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+            />
+            <input
+                style={styles.input}
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+            />
+            <button style={styles.button} onClick={handleSubmit}>
+                {mode === "login" ? "Login" : "Sign Up"}
+            </button>
+            <p style={styles.toggle} onClick={() => setMode(mode === "login" ? "signup" : "login")}>
+                {mode === "login" ? "No account? Sign up" : "Already have an account? Login"}
+            </p>
+            {message && <p>{message}</p>}
+        </div>
+    );
+}
+
+const styles = {
+    container: {
+        width: "300px",
+        margin: "auto",
+        padding: "20px",
+        background: "#1e1e1e",
+        color: "white",
+        borderRadius: "10px",
+        textAlign: "center"
+    },
+    input: {
+        width: "100%",
+        padding: "10px",
+        margin: "5px 0",
+        borderRadius: "5px",
+        border: "none"
+    },
+    button: {
+        width: "100%",
+        padding: "10px",
+        background: "#00aaff",
+        color: "white",
+        border: "none",
+        borderRadius: "5px",
+        cursor: "pointer"
+    },
+    toggle: {
+        marginTop: "10px",
+        color: "#00aaff",
+        cursor: "pointer"
+    }
+};
+How It Works Now
+Signup/Login
+
+Stores user in SQLite with hashed password.
+
+Returns a JWT token upon success.
+
+Token Storage
+
+Token is stored in localStorage in the frontend.
+
+On app reload, you can check for token to auto-login.
+
+Protected API Routes
+
+Add authenticateToken middleware to any API endpoint that should require login.
+
+Logout
+
+Just remove localStorage.removeItem("token").
+
+Example: Checking Logged-in User
+javascript
+Copy
+Edit
+useEffect(() => {
+    async function fetchUser() {
+        const token = localStorage.getItem("token");
+        if (token) {
+            const res = await axios.get("http://localhost:5000/me", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log("Logged in as:", res.data.user.username);
+        }
+    }
+    fetchUser();
+}, []);
+If you want, I can add password reset, email verification, and settings sync so your optimization app has a full cloud account system.

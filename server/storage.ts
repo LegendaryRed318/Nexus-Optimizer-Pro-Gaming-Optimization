@@ -1,34 +1,127 @@
-import { type SystemStats, type GameProfile, type ChatMessage, type InsertSystemStats, type InsertGameProfile, type InsertChatMessage } from "@shared/schema";
+import { 
+  type SystemStats, type GameProfile, type ChatMessage, 
+  type User, type UserSettings,
+  type InsertSystemStats, type InsertGameProfile, type InsertChatMessage,
+  type InsertUser, type InsertUserSettings, type UpdateUserSettings
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // Users
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUserLastLogin(id: string): Promise<void>;
+  
+  // User Settings
+  getUserSettings(userId: string): Promise<UserSettings | undefined>;
+  createUserSettings(settings: InsertUserSettings): Promise<UserSettings>;
+  updateUserSettings(userId: string, updates: UpdateUserSettings): Promise<UserSettings | undefined>;
+  
   // System Stats
-  getLatestSystemStats(): Promise<SystemStats | undefined>;
+  getLatestSystemStats(userId?: string): Promise<SystemStats | undefined>;
   createSystemStats(stats: InsertSystemStats): Promise<SystemStats>;
   
   // Game Profiles
-  getGameProfiles(): Promise<GameProfile[]>;
+  getGameProfiles(userId?: string): Promise<GameProfile[]>;
   createGameProfile(profile: InsertGameProfile): Promise<GameProfile>;
   updateGameProfile(id: string, updates: Partial<GameProfile>): Promise<GameProfile | undefined>;
   
   // Chat Messages
-  getChatMessages(): Promise<ChatMessage[]>;
+  getChatMessages(userId?: string): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
-  clearChatMessages(): Promise<void>;
+  clearChatMessages(userId?: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
+  private users: Map<string, User>;
+  private userSettings: Map<string, UserSettings>;
   private systemStats: Map<string, SystemStats>;
   private gameProfiles: Map<string, GameProfile>;
   private chatMessages: Map<string, ChatMessage>;
 
   constructor() {
+    this.users = new Map();
+    this.userSettings = new Map();
     this.systemStats = new Map();
     this.gameProfiles = new Map();
     this.chatMessages = new Map();
     
     // Initialize with default game profiles
     this.initializeGameProfiles();
+  }
+
+  // User methods
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.username === username);
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = {
+      ...insertUser,
+      id,
+      createdAt: new Date(),
+      lastLogin: null,
+    };
+    this.users.set(id, user);
+    
+    // Create default settings for new user
+    await this.createUserSettings({
+      userId: id,
+      darkMode: true,
+      soundEffects: true,
+      autoOptimization: false,
+      performanceAlerts: true,
+      colorTheme: "green",
+      fpsTargets: { fortnite: 144, global: 240 },
+    });
+    
+    return user;
+  }
+
+  async updateUserLastLogin(id: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.lastLogin = new Date();
+      this.users.set(id, user);
+    }
+  }
+
+  // User Settings methods
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    return Array.from(this.userSettings.values()).find(settings => settings.userId === userId);
+  }
+
+  async createUserSettings(insertSettings: InsertUserSettings): Promise<UserSettings> {
+    const id = randomUUID();
+    const settings: UserSettings = {
+      ...insertSettings,
+      id,
+      updatedAt: new Date(),
+    };
+    this.userSettings.set(id, settings);
+    return settings;
+  }
+
+  async updateUserSettings(userId: string, updates: UpdateUserSettings): Promise<UserSettings | undefined> {
+    const existingSettings = await this.getUserSettings(userId);
+    if (!existingSettings) {
+      return undefined;
+    }
+
+    const updatedSettings: UserSettings = {
+      ...existingSettings,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    
+    this.userSettings.set(existingSettings.id, updatedSettings);
+    return updatedSettings;
   }
 
   private initializeGameProfiles() {
@@ -60,9 +153,10 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async getLatestSystemStats(): Promise<SystemStats | undefined> {
+  async getLatestSystemStats(userId?: string): Promise<SystemStats | undefined> {
     const stats = Array.from(this.systemStats.values());
-    return stats.length > 0 ? stats[stats.length - 1] : undefined;
+    const filtered = userId ? stats.filter(s => s.userId === userId) : stats;
+    return filtered.length > 0 ? filtered[filtered.length - 1] : undefined;
   }
 
   async createSystemStats(insertStats: InsertSystemStats): Promise<SystemStats> {
@@ -76,8 +170,9 @@ export class MemStorage implements IStorage {
     return stats;
   }
 
-  async getGameProfiles(): Promise<GameProfile[]> {
-    return Array.from(this.gameProfiles.values());
+  async getGameProfiles(userId?: string): Promise<GameProfile[]> {
+    const profiles = Array.from(this.gameProfiles.values());
+    return userId ? profiles.filter(p => p.userId === userId || !p.userId) : profiles;
   }
 
   async createGameProfile(insertProfile: InsertGameProfile): Promise<GameProfile> {
@@ -100,8 +195,10 @@ export class MemStorage implements IStorage {
     return updatedProfile;
   }
 
-  async getChatMessages(): Promise<ChatMessage[]> {
-    return Array.from(this.chatMessages.values()).sort((a, b) => 
+  async getChatMessages(userId?: string): Promise<ChatMessage[]> {
+    const messages = Array.from(this.chatMessages.values());
+    const filtered = userId ? messages.filter(m => m.userId === userId || !m.userId) : messages;
+    return filtered.sort((a, b) => 
       (a.timestamp?.getTime() || 0) - (b.timestamp?.getTime() || 0)
     );
   }
@@ -117,8 +214,16 @@ export class MemStorage implements IStorage {
     return message;
   }
 
-  async clearChatMessages(): Promise<void> {
-    this.chatMessages.clear();
+  async clearChatMessages(userId?: string): Promise<void> {
+    if (userId) {
+      const messagesToDelete = Array.from(this.chatMessages.entries())
+        .filter(([_, message]) => message.userId === userId)
+        .map(([id, _]) => id);
+      
+      messagesToDelete.forEach(id => this.chatMessages.delete(id));
+    } else {
+      this.chatMessages.clear();
+    }
   }
 }
 

@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 
 interface SidebarItem {
   href: string;
@@ -16,6 +18,7 @@ const sidebarItems: SidebarItem[] = [
   { href: "/network", icon: "fas fa-wifi", label: "Network Booster", color: "text-neon-blue" },
   { href: "/gpu", icon: "fas fa-display", label: "GPU Tuner", color: "text-neon-green" },
   { href: "/fortnite", icon: "fas fa-gamepad", label: "Fortnite Optimizer", color: "text-blue-400" },
+  { href: "/settings", icon: "fas fa-cog", label: "Settings", color: "text-neon-yellow" },
 ];
 
 interface SidebarProps {
@@ -24,6 +27,7 @@ interface SidebarProps {
 
 export function Sidebar({ onOpenSettings }: SidebarProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   return (
     <div className="w-60 bg-dark-card border-r border-dark-border flex flex-col">
@@ -65,15 +69,19 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         })}
       </nav>
 
-      {/* Settings */}
+      {/* User Info */}
       <div className="p-4 border-t border-dark-border">
-        <button
-          onClick={onOpenSettings}
-          className="flex items-center p-3 rounded-lg hover:bg-dark-border transition-colors w-full group"
-        >
-          <i className="fas fa-cog text-lg mr-3 transition-all duration-300 group-hover:scale-110" />
-          <span>Settings</span>
-        </button>
+        <div className="bg-dark-bg rounded-lg p-3 mb-3">
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-neon-green to-neon-blue rounded-lg flex items-center justify-center mr-3">
+              <i className="fas fa-user text-white text-sm" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-medium text-sm truncate">{user?.username}</p>
+              <p className="text-gray-400 text-xs">Pro Account</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
