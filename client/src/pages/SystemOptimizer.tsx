@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function SystemOptimizer() {
   const [status, setStatus] = useState({
@@ -46,15 +47,27 @@ export default function SystemOptimizer() {
       tempCleanup: "Cleaned 2.3GB of temporary files and cache data",
       registryTweaks: "Applied 15 registry optimizations for better performance",
       startupManager: "Disabled 8 unnecessary startup programs",
-      ramCleaner: "Freed 1.2GB of RAM and optimized memory allocation",
+      ramCleaner: "Freed RAM using OS memory clean commands",
       cpuGpuTweaks: "Applied CPU priority tweaks and GPU performance settings",
       bgProcessMgmt: "Optimized background process priorities",
-    };
+    } as const;
 
     toast({
       title: "Optimization Complete",
       description: messages[feature],
     });
+  };
+
+  const runRamCleaner = async () => {
+    setStatus((s) => ({ ...s, ramCleaner: "running" }));
+    try {
+      await apiRequest("POST", "/api/ram/clean");
+      setStatus((s) => ({ ...s, ramCleaner: "done" }));
+      toast({ title: "RAM Cleaned", description: "Attempted to free unused memory. Some OSes require admin rights." });
+    } catch (e: any) {
+      setStatus((s) => ({ ...s, ramCleaner: "idle" }));
+      toast({ title: "RAM Clean Failed", description: String(e.message || e), variant: "destructive" });
+    }
   };
 
   const toggleProcessSelection = (pid: number) => {
@@ -220,14 +233,14 @@ export default function SystemOptimizer() {
                   ) : status.startupManager === "done" ? (
                     <>✓ Optimized</>
                   ) : (
-                    "Optimize Startup"
+                    "Optimize"
                   )}
                 </Button>
               </div>
               <div className="text-sm text-gray-400">
-                <p>• Disable unnecessary programs</p>
-                <p>• Prioritize gaming applications</p>
-                <p>• Reduce boot time</p>
+                <p>• Disable unnecessary startup tasks</p>
+                <p>• Delay non-critical services</p>
+                <p>• Improve boot performance</p>
               </div>
             </div>
 
@@ -235,89 +248,123 @@ export default function SystemOptimizer() {
             <div className="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <i className="fas fa-memory text-neon-green text-2xl mr-4 neon-glow" />
+                  <i className="fas fa-memory text-neon-yellow text-2xl mr-4 neon-glow" />
                   <div>
-                    <h3 className="text-xl font-bold text-white">RAM Optimizer</h3>
-                    <p className="text-gray-400 text-sm">Free up and optimize memory usage</p>
+                    <h3 className="text-xl font-bold text-white">RAM Cleaner</h3>
+                    <p className="text-gray-400 text-sm">Free unused memory and optimize allocation</p>
                   </div>
                 </div>
                 <Button
                   disabled={!backupCreated || status.ramCleaner === "running"}
-                  onClick={() => runOptimization("ramCleaner")}
+                  onClick={runRamCleaner}
                   className={cn(
                     "transition-all duration-300",
                     status.ramCleaner === "done" 
                       ? "bg-neon-green text-dark-bg" 
-                      : "bg-neon-green text-dark-bg hover:bg-neon-green/90",
+                      : "bg-neon-yellow text-dark-bg hover:bg-yellow-400",
                     "disabled:bg-gray-600 disabled:text-gray-400"
                   )}
                 >
                   {status.ramCleaner === "running" ? (
                     <>
                       <i className="fas fa-spinner animate-spin mr-2" />
-                      Cleaning...
+                      Cleaning RAM...
                     </>
                   ) : status.ramCleaner === "done" ? (
-                    <>✓ Optimized</>
+                    <>✓ Cleaned</>
                   ) : (
-                    "Optimize RAM"
+                    "Clean RAM"
                   )}
                 </Button>
               </div>
               <div className="text-sm text-gray-400">
-                <p>• Clear inactive memory</p>
-                <p>• Optimize memory allocation</p>
-                <p>• Defragment system memory</p>
+                <p>• Empty standby lists / purge inactive memory</p>
+                <p>• Drop file caches (Linux)</p>
+                <p>• Free unused allocations</p>
               </div>
             </div>
 
-          </div>
-
-          {/* Background Process Management */}
-          <div className="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                <i className="fas fa-tasks text-neon-purple text-2xl mr-4 neon-glow" />
-                <div>
-                  <h3 className="text-xl font-bold text-white">Background Process Management</h3>
-                  <p className="text-gray-400">Select and terminate resource-heavy processes</p>
+            {/* CPU/GPU Tweaks */}
+            <div className="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <i className="fas fa-microchip text-neon-green text-2xl mr-4 neon-glow" />
+                  <div>
+                    <h3 className="text-xl font-bold text-white">CPU/GPU Tweaks</h3>
+                    <p className="text-gray-400 text-sm">Apply performance-focused system tweaks</p>
+                  </div>
                 </div>
+                <Button
+                  disabled={!backupCreated || status.cpuGpuTweaks === "running"}
+                  onClick={() => runOptimization("cpuGpuTweaks")}
+                  className={cn(
+                    "transition-all duration-300",
+                    status.cpuGpuTweaks === "done" 
+                      ? "bg-neon-green text-dark-bg" 
+                      : "bg-neon-green text-dark-bg hover:bg-neon-green/90",
+                    "disabled:bg-gray-600 disabled:text-gray-400"
+                  )}
+                >
+                  {status.cpuGpuTweaks === "running" ? (
+                    <>
+                      <i className="fas fa-spinner animate-spin mr-2" />
+                      Applying...
+                    </>
+                  ) : status.cpuGpuTweaks === "done" ? (
+                    <>✓ Applied</>
+                  ) : (
+                    "Apply Tweaks"
+                  )}
+                </Button>
               </div>
-              <Button
-                onClick={killSelectedProcesses}
-                disabled={selectedProcesses.length === 0}
-                className="bg-red-500 text-white hover:bg-red-600 disabled:bg-gray-600 disabled:text-gray-400"
-              >
-                <i className="fas fa-times mr-2" />
-                Terminate Selected
-              </Button>
+              <div className="text-sm text-gray-400">
+                <p>• Power plan / frequency scaling</p>
+                <p>• Thread scheduling hints</p>
+                <p>• Driver-level performance presets</p>
+              </div>
             </div>
 
-            <div className="bg-dark-bg rounded-lg p-4 max-h-64 overflow-auto">
-              <div className="grid grid-cols-1 gap-2">
-                {processList.map(({ pid, name, cpu, memory }) => (
-                  <label
-                    key={pid}
-                    className="flex items-center justify-between p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-dark-border transition-colors"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Switch
-                        checked={selectedProcesses.includes(pid)}
-                        onCheckedChange={() => toggleProcessSelection(pid)}
-                      />
-                      <div>
-                        <span className="text-white font-medium">{name}</span>
-                        <div className="text-sm text-gray-400">
-                          PID: {pid} | CPU: {cpu}% | Memory: {memory}
-                        </div>
-                      </div>
-                    </div>
-                  </label>
-                ))}
+            {/* Background Process Management */}
+            <div className="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <i className="fas fa-tasks text-neon-blue text-2xl mr-4 neon-glow" />
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Background Process Management</h3>
+                    <p className="text-gray-400 text-sm">Optimize background process priorities</p>
+                  </div>
+                </div>
+                <Button
+                  disabled={!backupCreated || status.bgProcessMgmt === "running"}
+                  onClick={() => runOptimization("bgProcessMgmt")}
+                  className={cn(
+                    "transition-all duration-300",
+                    status.bgProcessMgmt === "done" 
+                      ? "bg-neon-green text-dark-bg" 
+                      : "bg-neon-blue text-dark-bg hover:bg-neon-blue/90",
+                    "disabled:bg-gray-600 disabled:text-gray-400"
+                  )}
+                >
+                  {status.bgProcessMgmt === "running" ? (
+                    <>
+                      <i className="fas fa-spinner animate-spin mr-2" />
+                      Optimizing...
+                    </>
+                  ) : status.bgProcessMgmt === "done" ? (
+                    <>✓ Optimized</>
+                  ) : (
+                    "Optimize"
+                  )}
+                </Button>
+              </div>
+              <div className="text-sm text-gray-400">
+                <p>• Lower priority for background apps</p>
+                <p>• Stop non-essential services during gaming</p>
+                <p>• Re-enable after session</p>
               </div>
             </div>
+
           </div>
-
         </div>
       </div>
     </div>
