@@ -73,8 +73,10 @@ Designed for **cloud-based AI service integration** supporting multiple provider
 - **esbuild** - High-performance JavaScript bundler for production builds
 
 ### Current Integrations
-- **Multi-GPU Support** - NVIDIA and Intel GPU tuning capabilities with vendor-specific optimization panels
-- **Intel GPU Tools** - Graphics Command Center, Power Gadget, and Level Zero integration readiness
+- **Universal Multi-GPU Support** - Comprehensive NVIDIA, AMD, and Intel GPU tuning with vendor-specific optimization panels
+- **Frame Rate Target Control** - Direct Fortnite INI editing and global DirectX FPS capping with multiple preset options
+- **AMD ADLX Integration Ready** - Frame Rate Target Control (FRTC), fan curves, power limits, Anti-Lag, and Image Sharpening
+- **Intel GPU Tools** - Graphics Command Center, Power Gadget, and Level Zero integration readiness  
 - **Hardware-Accelerated GPU Scheduling (HAGS)** - Windows registry optimization with safe backup/restore
 - **Per-App GPU Preferences** - Windows Graphics Settings integration for game-specific GPU assignment
 

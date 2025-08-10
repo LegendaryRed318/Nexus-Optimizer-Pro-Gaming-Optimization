@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import FpsCapControl from "@/components/FpsCapControl";
 
 interface Message {
   sender: "user" | "bot";
@@ -439,6 +440,9 @@ export default function FortniteOptimizer() {
               </div>
             </div>
           </div>
+
+          {/* FPS Cap Control */}
+          <FpsCapControl />
 
           {/* Quick Actions */}
           <div className="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">

@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import IntelGpuPanel from "@/components/IntelGpuPanel";
+import AmdGpuPanel from "@/components/AmdGpuPanel";
+import FpsCapControl from "@/components/FpsCapControl";
 
 export default function GPUTuner() {
   const [gpuStats, setGpuStats] = useState({
@@ -136,20 +138,34 @@ export default function GPUTuner() {
           </div>
 
           <Tabs defaultValue="nvidia" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-dark-card border border-dark-border">
+            <TabsList className="grid w-full grid-cols-4 bg-dark-card border border-dark-border">
               <TabsTrigger 
                 value="nvidia" 
                 className="data-[state=active]:bg-neon-green data-[state=active]:text-dark-bg"
               >
                 <i className="fab fa-nvidia mr-2" />
-                NVIDIA GPU
+                NVIDIA
+              </TabsTrigger>
+              <TabsTrigger 
+                value="amd" 
+                className="data-[state=active]:bg-red-500 data-[state=active]:text-white"
+              >
+                <i className="fab fa-amd mr-2" />
+                AMD
               </TabsTrigger>
               <TabsTrigger 
                 value="intel" 
                 className="data-[state=active]:bg-neon-blue data-[state=active]:text-white"
               >
                 <i className="fab fa-intel mr-2" />
-                Intel GPU
+                Intel
+              </TabsTrigger>
+              <TabsTrigger 
+                value="fps-control" 
+                className="data-[state=active]:bg-neon-yellow data-[state=active]:text-dark-bg"
+              >
+                <i className="fas fa-tachometer-alt mr-2" />
+                FPS Control
               </TabsTrigger>
             </TabsList>
 
@@ -423,8 +439,16 @@ export default function GPUTuner() {
               </div>
             </TabsContent>
 
+            <TabsContent value="amd" className="space-y-8">
+              <AmdGpuPanel />
+            </TabsContent>
+
             <TabsContent value="intel" className="space-y-8">
               <IntelGpuPanel />
+            </TabsContent>
+
+            <TabsContent value="fps-control" className="space-y-8">
+              <FpsCapControl />
             </TabsContent>
           </Tabs>
 
