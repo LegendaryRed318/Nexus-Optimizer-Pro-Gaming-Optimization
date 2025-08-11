@@ -1,242 +1,433 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Alert, AlertDescription } from './ui/alert';
+import { Loader2, Eye, EyeOff, Shield, User, Mail, Lock, Key } from 'lucide-react';
+
+interface LoginForm {
+  username: string;
+  password: string;
+  twoFactorCode?: string;
+}
+
+interface SignupForm {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+interface PasswordResetForm {
+  email: string;
+}
 
 export default function LoginSignup() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [loginData, setLoginData] = useState({ username: "", password: "" });
-  const [signupData, setSignupData] = useState({ username: "", email: "", password: "", confirmPassword: "" });
-  
-  const { login, signup } = useAuth();
-  const { toast } = useToast();
+  const { login, signup, isAuthenticated, isLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState('login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Form states
+  const [loginForm, setLoginForm] = useState<LoginForm>({
+    username: '',
+    password: '',
+    twoFactorCode: '',
+  });
+
+  const [signupForm, setSignupForm] = useState<SignupForm>({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+
+  const [passwordResetForm, setPasswordResetForm] = useState<PasswordResetForm>({
+    email: '',
+  });
+
+  // Reset forms when switching tabs
+  useEffect(() => {
+    setError(null);
+    setSuccess(null);
+    setRequires2FA(false);
+    setIsSubmitting(false);
+  }, [activeTab]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setError(null);
+    setIsSubmitting(true);
 
     try {
-      await login(loginData.username, loginData.password);
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in to Nexus Optimizer Pro.",
-      });
-    } catch (error) {
-      toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : "An error occurred during login.",
-        variant: "destructive",
-      });
+      const result = await login(loginForm.username, loginForm.password, loginForm.twoFactorCode);
+      
+      if (result.requires2FA) {
+        setRequires2FA(true);
+        setSuccess('Please enter your 2FA code');
+      } else if (result.success) {
+        setSuccess('Login successful! Redirecting...');
+        // Redirect will be handled by AuthContext
+      } else {
+        setError(result.message || 'Login failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (signupData.password !== signupData.confirmPassword) {
-      toast({
-        title: "Password Mismatch",
-        description: "Passwords do not match. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (signupData.password.length < 6) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
+    setError(null);
+    setIsSubmitting(true);
 
     try {
-      await signup(signupData.username, signupData.password, signupData.email);
-      toast({
-        title: "Account Created!",
-        description: "Welcome to Nexus Optimizer Pro. Your account has been created successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Signup Failed",
-        description: error instanceof Error ? error.message : "An error occurred during signup.",
-        variant: "destructive",
-      });
+      await signup(signupForm.username, signupForm.email, signupForm.password);
+      setSuccess('Account created successfully! You can now log in.');
+      setActiveTab('login');
+      setSignupForm({ username: '', email: '', password: '', confirmPassword: '' });
+    } catch (err: any) {
+      setError(err.message || 'Signup failed');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-dark-bg via-dark-card to-dark-bg opacity-50" />
-      
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-20 left-20 w-32 h-32 bg-neon-green rounded-full blur-3xl" />
-        <div className="absolute bottom-40 right-32 w-48 h-48 bg-neon-blue rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-neon-purple rounded-full blur-3xl" />
-      </div>
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
 
-      <Card className="w-full max-w-md bg-dark-card border-dark-border relative z-10">
-        <CardHeader className="text-center space-y-2">
+    try {
+      const response = await fetch('/api/auth/password-reset-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passwordResetForm),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSuccess(data.message);
+        setPasswordResetForm({ email: '' });
+      } else {
+        setError(data.error || 'Failed to send reset email');
+      }
+    } catch (err: any) {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (form: string, field: string, value: string) => {
+    switch (form) {
+      case 'login':
+        setLoginForm(prev => ({ ...prev, [field]: value }));
+        break;
+      case 'signup':
+        setSignupForm(prev => ({ ...prev, [field]: value }));
+        break;
+      case 'passwordReset':
+        setPasswordResetForm(prev => ({ ...prev, [field]: value }));
+        break;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null; // User is already logged in
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
+      <Card className="w-full max-w-md bg-gray-800/50 border-gray-700 text-white">
+        <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-neon-green to-neon-blue rounded-xl flex items-center justify-center mr-4">
-              <i className="fas fa-microchip text-white text-2xl" />
-            </div>
+            <Shield className="h-12 w-12 text-green-500 mr-3" />
             <div>
-              <CardTitle className="text-2xl font-bold text-white font-orbitron">Nexus Optimizer</CardTitle>
-              <CardDescription className="text-gray-400">Pro Gaming Optimization</CardDescription>
+              <CardTitle className="text-2xl text-white">Nexus Optimizer Pro</CardTitle>
+              <CardDescription className="text-gray-300">
+                Ultimate Gaming Performance
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-dark-bg border border-dark-border">
-              <TabsTrigger 
-                value="login" 
-                className="data-[state=active]:bg-neon-green data-[state=active]:text-dark-bg"
-              >
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-gray-700">
+              <TabsTrigger value="login" className="data-[state=active]:bg-green-600">
                 Login
               </TabsTrigger>
-              <TabsTrigger 
-                value="signup" 
-                className="data-[state=active]:bg-neon-blue data-[state=active]:text-white"
-              >
+              <TabsTrigger value="signup" className="data-[state=active]:bg-green-600">
                 Sign Up
+              </TabsTrigger>
+              <TabsTrigger value="reset" className="data-[state=active]:bg-green-600">
+                Reset
               </TabsTrigger>
             </TabsList>
 
+            {/* Login Tab */}
             <TabsContent value="login" className="space-y-4 mt-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-username" className="text-white">Username</Label>
+                  <Label htmlFor="login-username" className="text-gray-300">
+                    <User className="inline h-4 w-4 mr-2" />
+                    Username
+                  </Label>
                   <Input
                     id="login-username"
                     type="text"
+                    value={loginForm.username}
+                    onChange={(e) => handleInputChange('login', 'username', e.target.value)}
                     placeholder="Enter your username"
-                    value={loginData.username}
-                    onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
+                    className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
                     required
-                    className="bg-dark-bg border-dark-border text-white placeholder:text-gray-400"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="login-password" className="text-white">Password</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    required
-                    className="bg-dark-bg border-dark-border text-white placeholder:text-gray-400"
-                  />
+                  <Label htmlFor="login-password" className="text-gray-300">
+                    <Lock className="inline h-4 w-4 mr-2" />
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      value={loginForm.password}
+                      onChange={(e) => handleInputChange('login', 'password', e.target.value)}
+                      placeholder="Enter your password"
+                      className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 pr-10"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-neon-green text-dark-bg hover:bg-neon-green/90 font-semibold"
-                  disabled={isLoading}
+
+                {requires2FA && (
+                  <div className="space-y-2">
+                    <Label htmlFor="login-2fa" className="text-gray-300">
+                      <Key className="inline h-4 w-4 mr-2" />
+                      2FA Code
+                    </Label>
+                    <Input
+                      id="login-2fa"
+                      type="text"
+                      value={loginForm.twoFactorCode || ''}
+                      onChange={(e) => handleInputChange('login', 'twoFactorCode', e.target.value)}
+                      placeholder="Enter 6-digit code"
+                      className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
+                      maxLength={6}
+                      required
+                    />
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  disabled={isSubmitting}
                 >
-                  {isLoading ? (
-                    <>
-                      <i className="fas fa-spinner animate-spin mr-2" />
-                      Logging in...
-                    </>
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
-                    <>
-                      <i className="fas fa-sign-in-alt mr-2" />
-                      Login
-                    </>
+                    <Shield className="h-4 w-4 mr-2" />
                   )}
+                  {requires2FA ? 'Verify & Login' : 'Login'}
                 </Button>
               </form>
             </TabsContent>
 
+            {/* Signup Tab */}
             <TabsContent value="signup" className="space-y-4 mt-6">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-username" className="text-white">Username</Label>
+                  <Label htmlFor="signup-username" className="text-gray-300">
+                    <User className="inline h-4 w-4 mr-2" />
+                    Username
+                  </Label>
                   <Input
                     id="signup-username"
                     type="text"
+                    value={signupForm.username}
+                    onChange={(e) => handleInputChange('signup', 'username', e.target.value)}
                     placeholder="Choose a username"
-                    value={signupData.username}
-                    onChange={(e) => setSignupData({ ...signupData, username: e.target.value })}
+                    className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
                     required
-                    className="bg-dark-bg border-dark-border text-white placeholder:text-gray-400"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="text-white">Email (Optional)</Label>
+                  <Label htmlFor="signup-email" className="text-gray-300">
+                    <Mail className="inline h-4 w-4 mr-2" />
+                    Email (Optional)
+                  </Label>
                   <Input
                     id="signup-email"
                     type="email"
-                    placeholder="Enter your email"
-                    value={signupData.email}
-                    onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                    className="bg-dark-bg border-dark-border text-white placeholder:text-gray-400"
+                    value={signupForm.email}
+                    onChange={(e) => handleInputChange('signup', 'email', e.target.value)}
+                    placeholder="your@email.com"
+                    className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="text-white">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="Create a password"
-                    value={signupData.password}
-                    onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                    required
-                    className="bg-dark-bg border-dark-border text-white placeholder:text-gray-400"
-                  />
+                  <Label htmlFor="signup-password" className="text-gray-300">
+                    <Lock className="inline h-4 w-4 mr-2" />
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      value={signupForm.password}
+                      onChange={(e) => handleInputChange('signup', 'password', e.target.value)}
+                      placeholder="Create a strong password"
+                      className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 pr-10"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Must contain at least 8 characters, one uppercase, one lowercase, and one number
+                  </p>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password" className="text-white">Confirm Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={signupData.confirmPassword}
-                    onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                    required
-                    className="bg-dark-bg border-dark-border text-white placeholder:text-gray-400"
-                  />
+                  <Label htmlFor="signup-confirm-password" className="text-gray-300">
+                    <Lock className="inline h-4 w-4 mr-2" />
+                    Confirm Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-confirm-password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={signupForm.confirmPassword}
+                      onChange={(e) => handleInputChange('signup', 'confirmPassword', e.target.value)}
+                      placeholder="Confirm your password"
+                      className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 pr-10"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-neon-blue text-white hover:bg-neon-blue/90 font-semibold"
-                  disabled={isLoading}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  disabled={isSubmitting}
                 >
-                  {isLoading ? (
-                    <>
-                      <i className="fas fa-spinner animate-spin mr-2" />
-                      Creating account...
-                    </>
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
-                    <>
-                      <i className="fas fa-user-plus mr-2" />
-                      Create Account
-                    </>
+                    <User className="h-4 w-4 mr-2" />
                   )}
+                  Create Account
+                </Button>
+              </form>
+            </TabsContent>
+
+            {/* Password Reset Tab */}
+            <TabsContent value="reset" className="space-y-4 mt-6">
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email" className="text-gray-300">
+                    <Mail className="inline h-4 w-4 mr-2" />
+                    Email Address
+                  </Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={passwordResetForm.email}
+                    onChange={(e) => handleInputChange('passwordReset', 'email', e.target.value)}
+                    placeholder="Enter your email address"
+                    className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
+                    required
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Key className="h-4 w-4 mr-2" />
+                  )}
+                  Send Reset Link
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
-              Secure JWT authentication • Settings sync across devices
-            </p>
+          {/* Error and Success Messages */}
+          {error && (
+            <Alert className="mt-4 border-red-500 bg-red-500/10">
+              <AlertDescription className="text-red-400">{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {success && (
+            <Alert className="mt-4 border-green-500 bg-green-500/10">
+              <AlertDescription className="text-green-400">{success}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Security Features Info */}
+          <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
+            <h4 className="text-sm font-semibold text-gray-300 mb-2">🔒 Security Features</h4>
+            <ul className="text-xs text-gray-400 space-y-1">
+              <li>• Two-factor authentication (2FA)</li>
+              <li>• Account lockout protection</li>
+              <li>• Secure password requirements</li>
+              <li>• Rate limiting protection</li>
+              <li>• Security event logging</li>
+            </ul>
           </div>
         </CardContent>
       </Card>

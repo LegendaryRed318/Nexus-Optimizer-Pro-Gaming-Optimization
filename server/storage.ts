@@ -1,8 +1,9 @@
 import { 
   type SystemStats, type GameProfile, type ChatMessage, 
-  type User, type UserSettings,
+  type User, type UserSettings, type PasswordReset, type SecurityLog,
   type InsertSystemStats, type InsertGameProfile, type InsertChatMessage,
-  type InsertUser, type InsertUserSettings, type UpdateUserSettings
+  type InsertUser, type InsertUserSettings, type UpdateUserSettings,
+  type InsertPasswordReset, type InsertSecurityLog
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -12,11 +13,27 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLastLogin(id: string): Promise<void>;
+  updateUser2FA(id: string, secret: string | null, enabled: boolean): Promise<void>;
+  lockUser(id: string, until: Date): Promise<void>;
+  unlockUser(id: string): Promise<void>;
+  incrementFailedLogins(id: string): Promise<void>;
+  resetFailedLogins(id: string): Promise<void>;
   
   // User Settings
   getUserSettings(userId: string): Promise<UserSettings | undefined>;
   createUserSettings(settings: InsertUserSettings): Promise<UserSettings>;
   updateUserSettings(userId: string, updates: UpdateUserSettings): Promise<UserSettings | undefined>;
+  
+  // Password Resets
+  createPasswordReset(reset: InsertPasswordReset): Promise<PasswordReset>;
+  getPasswordResetByToken(token: string): Promise<PasswordReset | undefined>;
+  markPasswordResetUsed(id: string): Promise<void>;
+  cleanupExpiredPasswordResets(): Promise<void>;
+  
+  // Security Logs
+  createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
+  getSecurityLogs(userId?: string): Promise<SecurityLog[]>;
+  clearSecurityLogs(userId?: string): Promise<void>;
   
   // System Stats
   getLatestSystemStats(userId?: string): Promise<SystemStats | undefined>;
@@ -36,6 +53,8 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private userSettings: Map<string, UserSettings>;
+  private passwordResets: Map<string, PasswordReset>;
+  private securityLogs: Map<string, SecurityLog>;
   private systemStats: Map<string, SystemStats>;
   private gameProfiles: Map<string, GameProfile>;
   private chatMessages: Map<string, ChatMessage>;
@@ -43,6 +62,8 @@ export class MemStorage implements IStorage {
   constructor() {
     this.users = new Map();
     this.userSettings = new Map();
+    this.passwordResets = new Map();
+    this.securityLogs = new Map();
     this.systemStats = new Map();
     this.gameProfiles = new Map();
     this.chatMessages = new Map();
@@ -67,6 +88,11 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       lastLogin: null,
+      twoFactorSecret: null,
+      twoFactorEnabled: false,
+      isLocked: false,
+      lockoutUntil: null,
+      failedLoginAttempts: 0,
     };
     this.users.set(id, user);
     
@@ -88,6 +114,50 @@ export class MemStorage implements IStorage {
     const user = this.users.get(id);
     if (user) {
       user.lastLogin = new Date();
+      this.users.set(id, user);
+    }
+  }
+
+  async updateUser2FA(id: string, secret: string | null, enabled: boolean): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.twoFactorSecret = secret;
+      user.twoFactorEnabled = enabled;
+      this.users.set(id, user);
+    }
+  }
+
+  async lockUser(id: string, until: Date): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.isLocked = true;
+      user.lockoutUntil = until;
+      this.users.set(id, user);
+    }
+  }
+
+  async unlockUser(id: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.isLocked = false;
+      user.lockoutUntil = null;
+      user.failedLoginAttempts = 0;
+      this.users.set(id, user);
+    }
+  }
+
+  async incrementFailedLogins(id: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      this.users.set(id, user);
+    }
+  }
+
+  async resetFailedLogins(id: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.failedLoginAttempts = 0;
       this.users.set(id, user);
     }
   }
@@ -124,6 +194,68 @@ export class MemStorage implements IStorage {
     return updatedSettings;
   }
 
+  // Password Reset methods
+  async createPasswordReset(reset: InsertPasswordReset): Promise<PasswordReset> {
+    const id = randomUUID();
+    const passwordReset: PasswordReset = {
+      ...reset,
+      id,
+      createdAt: new Date(),
+      used: false,
+    };
+    this.passwordResets.set(id, passwordReset);
+    return passwordReset;
+  }
+
+  async getPasswordResetByToken(token: string): Promise<PasswordReset | undefined> {
+    return Array.from(this.passwordResets.values()).find(reset => reset.token === token && !reset.used);
+  }
+
+  async markPasswordResetUsed(id: string): Promise<void> {
+    const reset = this.passwordResets.get(id);
+    if (reset) {
+      reset.used = true;
+      this.passwordResets.set(id, reset);
+    }
+  }
+
+  async cleanupExpiredPasswordResets(): Promise<void> {
+    const now = new Date();
+    const expiredResets = Array.from(this.passwordResets.entries())
+      .filter(([_, reset]) => reset.expiresAt < now || reset.used);
+    
+    expiredResets.forEach(([id, _]) => this.passwordResets.delete(id));
+  }
+
+  // Security Log methods
+  async createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog> {
+    const id = randomUUID();
+    const securityLog: SecurityLog = {
+      ...log,
+      id,
+      timestamp: new Date(),
+    };
+    this.securityLogs.set(id, securityLog);
+    return securityLog;
+  }
+
+  async getSecurityLogs(userId?: string): Promise<SecurityLog[]> {
+    const logs = Array.from(this.securityLogs.values());
+    return userId ? logs.filter(log => log.userId === userId) : logs;
+  }
+
+  async clearSecurityLogs(userId?: string): Promise<void> {
+    if (userId) {
+      const logsToDelete = Array.from(this.securityLogs.entries())
+        .filter(([_, log]) => log.userId === userId)
+        .map(([id, _]) => id);
+      
+      logsToDelete.forEach(id => this.securityLogs.delete(id));
+    } else {
+      this.securityLogs.clear();
+    }
+  }
+
   private initializeGameProfiles() {
     const defaultProfiles = [
       {
@@ -148,7 +280,12 @@ export class MemStorage implements IStorage {
 
     defaultProfiles.forEach(profile => {
       const id = randomUUID();
-      const gameProfile: GameProfile = { ...profile, id, isActive: profile.isActive ?? false };
+      const gameProfile: GameProfile = { 
+        ...profile, 
+        id, 
+        userId: null, // Default profiles don't belong to any specific user
+        isActive: profile.isActive ?? false 
+      };
       this.gameProfiles.set(id, gameProfile);
     });
   }

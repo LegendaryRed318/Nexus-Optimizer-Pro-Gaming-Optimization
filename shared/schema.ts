@@ -10,6 +10,11 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   lastLogin: timestamp("last_login"),
+  twoFactorSecret: text("two_factor_secret"),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  isLocked: boolean("is_locked").default(false),
+  lockoutUntil: timestamp("lockout_until"),
+  failedLoginAttempts: integer("failed_login_attempts").default(0),
 });
 
 export const userSettings = pgTable("user_settings", {
@@ -22,6 +27,25 @@ export const userSettings = pgTable("user_settings", {
   colorTheme: varchar("color_theme", { length: 20 }).default("green").notNull(),
   fpsTargets: json("fps_targets").default({ fortnite: 144, global: 240 }),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const passwordResets = pgTable("password_resets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const securityLogs = pgTable("security_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  event: varchar("event", { length: 100 }).notNull(),
+  details: json("details"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").defaultNow(),
 });
 
 export const systemStats = pgTable("system_stats", {
@@ -58,11 +82,15 @@ export const chatMessages = pgTable("chat_messages", {
 });
 
 // User authentication schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, lastLogin: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, lastLogin: true, twoFactorSecret: true, twoFactorEnabled: true, isLocked: true, lockoutUntil: true, failedLoginAttempts: true });
 export const loginUserSchema = z.object({
   username: z.string().min(3).max(50),
   password: z.string().min(6),
 });
+
+// Password reset schemas
+export const insertPasswordResetSchema = createInsertSchema(passwordResets).omit({ id: true, createdAt: true, used: true });
+export const insertSecurityLogSchema = createInsertSchema(securityLogs).omit({ id: true, timestamp: true });
 
 // User settings schemas
 export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({ id: true, updatedAt: true });
@@ -76,8 +104,12 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ i
 // Type exports
 export type User = typeof users.$inferSelect;
 export type UserSettings = typeof userSettings.$inferSelect;
+export type PasswordReset = typeof passwordResets.$inferSelect;
+export type SecurityLog = typeof securityLogs.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginUserSchema>;
+export type InsertPasswordReset = z.infer<typeof insertPasswordResetSchema>;
+export type InsertSecurityLog = z.infer<typeof insertSecurityLogSchema>;
 export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
 export type UpdateUserSettings = z.infer<typeof updateUserSettingsSchema>;
 
